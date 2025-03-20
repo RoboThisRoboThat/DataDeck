@@ -1,6 +1,7 @@
 {
   "name": "data-deck",
-  "private": true,
+  "productName": "Data Deck",
+  "private": false,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
@@ -48,5 +49,24 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "appId": "com.data-deck",
+    "productName": "Data Deck",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "mac": {
+      "icon": "data-deck-logo.svg"
+    },
+    "win": {
+      "icon": "data-deck-logo.svg"
+    },
+    "linux": {
+      "icon": "data-deck-logo.svg"
+    }
+  }
 }

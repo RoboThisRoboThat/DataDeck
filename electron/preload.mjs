@@ -1,11 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-// Add a debug helper
-const debugIPC = (method, ...args) => {
-    console.log(`[Preload] Invoking ${method} with args:`, JSON.stringify(args));
-    return args;
-};
-
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('database', {
