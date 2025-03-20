@@ -1,14 +1,8 @@
 import { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  TextField,
-  Typography,
-  CircularProgress
-} from '@mui/material';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useAppDispatch } from '../../../store/hooks';
 import { updateCellValue } from '../../../store/slices/tablesSlice';
 import type { FilterCondition, SortConfig, PaginationState } from '../types';
@@ -113,76 +107,100 @@ const EditCellModal = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle className="bg-gray-50 border-b">
-        Edit Cell Value
-      </DialogTitle>
-      
-      <DialogContent className="p-6">
-        <div className="mb-4">
-          <Typography variant="subtitle2" className="mb-1 text-gray-600">
-            Table
-          </Typography>
-          <Typography variant="body1" className="font-medium">
-            {tableName}
-          </Typography>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="bg-gray-50 -mx-6 -mt-4 px-6 py-3 border-b">
+            Edit Cell Value
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="p-6">
+          <div className="mb-4">
+            <h4 className="mb-1 text-sm font-medium text-gray-600">
+              Table
+            </h4>
+            <p className="font-medium">
+              {tableName}
+            </p>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="mb-1 text-sm font-medium text-gray-600">
+              Column
+            </h4>
+            <p className="font-medium">
+              {columnName}
+            </p>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="mb-1 text-sm font-medium text-gray-600">
+              Current Value
+            </h4>
+            <p className="font-medium">
+              {value === null || value === undefined ? 
+                <span className="text-gray-400 italic">NULL</span> : 
+                typeof value === 'object' ? 
+                  <pre className="bg-gray-50 p-2 rounded overflow-auto max-h-32">{JSON.stringify(value, null, 2)}</pre> : 
+                  String(value)
+              }
+            </p>
+          </div>
+          
+          <div className="mb-2">
+            <h4 className="mb-1 text-sm font-medium text-gray-600">
+              New Value
+            </h4>
+            {typeof value === 'object' ? (
+              <Textarea
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                rows={6}
+                disabled={loading}
+                className={error ? "border-red-500" : ""}
+              />
+            ) : (
+              <Input
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                disabled={loading}
+                className={error ? "border-red-500" : ""}
+              />
+            )}
+            {error && (
+              <p className="mt-1 text-sm text-red-500">{error}</p>
+            )}
+          </div>
         </div>
         
-        <div className="mb-4">
-          <Typography variant="subtitle2" className="mb-1 text-gray-600">
-            Column
-          </Typography>
-          <Typography variant="body1" className="font-medium">
-            {columnName}
-          </Typography>
-        </div>
-        
-        <div className="mb-4">
-          <Typography variant="subtitle2" className="mb-1 text-gray-600">
-            Current Value
-          </Typography>
-          <Typography variant="body1" className="font-medium">
-            {value === null || value === undefined ? 
-              <span className="text-gray-400 italic">NULL</span> : 
-              typeof value === 'object' ? 
-                <pre className="bg-gray-50 p-2 rounded overflow-auto max-h-32">{JSON.stringify(value, null, 2)}</pre> : 
-                String(value)
-            }
-          </Typography>
-        </div>
-        
-        <div className="mb-2">
-          <Typography variant="subtitle2" className="mb-1 text-gray-600">
-            New Value
-          </Typography>
-          <TextField
-            fullWidth
-            multiline={typeof value === 'object'}
-            rows={typeof value === 'object' ? 6 : 1}
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            variant="outlined"
-            error={!!error}
-            helperText={error}
+        <DialogFooter className="bg-gray-50 px-6 py-4 -mx-6 -mb-6 border-t">
+          <Button 
+            variant="outline" 
+            onClick={onClose} 
             disabled={loading}
-          />
-        </div>
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={loading}
+            className={loading ? "opacity-80" : ""}
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      
-      <DialogActions className="p-4 bg-gray-50 border-t">
-        <Button onClick={onClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSave} 
-          color="primary" 
-          variant="contained" 
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={16} /> : null}
-        >
-          Save Changes
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

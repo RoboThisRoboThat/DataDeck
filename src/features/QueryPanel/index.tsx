@@ -1,17 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Box, 
-  Paper, 
-  Typography, 
-  Button, 
-  IconButton, 
-  Tabs,
-  Tab,
-  Tooltip,
-  CircularProgress,
-  Menu,
-  MenuItem,
-} from '@mui/material';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   FiPlay, 
   FiSave, 
@@ -21,32 +8,44 @@ import {
   FiClock,
   FiChevronRight,
   FiAlertTriangle,
-  FiCheckCircle,
-  FiFileText,
-  FiCode,
-  FiDatabase
+  FiCheckCircle
 } from 'react-icons/fi';
+import { Button } from '../../components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import QueryEditor from './components/QueryEditor';
 import QueryResults from './components/QueryResults';
 import SavedQueries from './components/SavedQueries';
 import SaveQueryModal from './components/SaveQueryModal';
+import { IoClose } from 'react-icons/io5';
 
 interface QueryPanelProps {
   connectionId: string;
 }
 
+interface DatabaseQueryResult {
+  rows?: Record<string, unknown>[];
+  data?: Record<string, unknown>[];
+  columns?: string[];
+  affectedRows?: number;
+  isSelect?: boolean;
+}
+
 interface QueryResult {
   id: string;
   sql: string;
-  data: unknown[];
+  data: Record<string, unknown>[];
   columns: string[];
   error?: string;
   status: 'running' | 'completed' | 'error';
   executionTime?: number;
+  affectedRows?: number;
+  isSelect?: boolean;
 }
 
 function QueryPanel({ connectionId }: QueryPanelProps) {
-  const editorRef = useRef<MonacoEditor | null>(null);
+  const editorRef = useRef<any | null>(null);
   
   // State for editor
   const [sql, setSql] = useState<string>('SELECT * FROM ');
@@ -61,8 +60,8 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
   const [loadingSavedQueries, setLoadingSavedQueries] = useState<boolean>(true);
   const [savedQueriesError, setSavedQueriesError] = useState<string | null>(null);
   
-  // Function to fetch saved queries
-  const fetchSavedQueries = async () => {
+  // Function to fetch saved queries - memoized with useCallback
+  const fetchSavedQueries = useCallback(async () => {
     setLoadingSavedQueries(true);
     setSavedQueriesError(null);
     
@@ -88,12 +87,12 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
     } finally {
       setLoadingSavedQueries(false);
     }
-  };
+  }, [connectionId]);
   
-  // Load saved queries on mount and when connectionId changes
+  // Load saved queries on mount and when fetchSavedQueries changes
   useEffect(() => {
     fetchSavedQueries();
-  }, [connectionId]);
+  }, [fetchSavedQueries]);
   
   // Load unsaved query on initial mount
   useEffect(() => {
@@ -150,7 +149,7 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
   
   // State for results
   const [queryResults, setQueryResults] = useState<QueryResult[]>([]);
-  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
+  const [activeResultIndex, setActiveResultIndex] = useState<number | null>(null);
   
   // State for execution
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
@@ -160,7 +159,17 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
   // State for UI
   const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+  
+  // Ensure activeResultIndex is valid when queryResults change
+  useEffect(() => {
+    if (activeResultIndex === null || 
+        activeResultIndex < 0 || 
+        activeResultIndex >= queryResults.length) {
+      if (queryResults.length > 0) {
+        setActiveResultIndex(queryResults.length - 1);
+      }
+    }
+  }, [queryResults, activeResultIndex]);
   
   // Clear timer when component unmounts
   useEffect(() => {
@@ -226,7 +235,6 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
     
     setIsExecuting(true);
     setError(null);
-    startTimer();
     
     // Split into multiple queries if semicolons are present
     const queries = queryToExecute
@@ -239,50 +247,106 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
       return;
     }
     
-    // Create a new result tab for this execution
-    const resultId = Date.now().toString();
-    setQueryResults([
-      ...queryResults,
-      {
+    // Track all new result IDs to ensure we can find them later
+    const resultIds: string[] = [];
+    // Create a new results array with all existing results
+    let newQueryResults = [...queryResults];
+    
+    // First, create all the tabs for each query
+    for (let i = 0; i < queries.length; i++) {
+      const queryText = queries[i];
+      if (!queryText.trim()) continue;
+      
+      // Create a unique ID for this query result
+      const resultId = `${Date.now()}-${i}`;
+      resultIds.push(resultId);
+      
+      // Add a new result tab for this query
+      const newResult: QueryResult = {
         id: resultId,
-        sql: queryToExecute,
+        sql: queryText,
         data: [],
         columns: [],
         status: 'running',
         executionTime: 0
-      }
-    ]);
+      };
+      
+      newQueryResults = [...newQueryResults, newResult];
+    }
     
-    // Set the new tab as active
-    setActiveTabIndex(queryResults.length);
+    // Update state with all new tabs
+    setQueryResults(newQueryResults);
     
-    // Execute each query in sequence
+    // Set the first new tab as active if this is our first query
+    if (activeResultIndex === null && resultIds.length > 0) {
+      setActiveResultIndex(queryResults.length);
+    }
+    
+    // Now execute each query in sequence
     for (let i = 0; i < queries.length; i++) {
       const queryText = queries[i];
+      if (!queryText.trim() || i >= resultIds.length) continue;
+      
+      const resultId = resultIds[i];
+      
+      // Start the timer for this specific query
+      startTimer();
       
       try {
-        // Use db:query instead of execute-query
-        const result = await window.database.query(connectionId, queryText);
+        // Execute this specific query
+        const result = await window.database.query(connectionId, queryText) as DatabaseQueryResult | Record<string, unknown>[];
         const executionTime = stopTimer();
         
         // Update results with success
-        setQueryResults(prev => prev.map(res => 
-          res.id === resultId 
-            ? { 
-                ...res, 
-                data: Array.isArray(result) 
-                  ? result 
-                  : (result.rows || result.data || []),
-                columns: result.columns || (result.data && result.data.length > 0
-                  ? Object.keys(result.data[0]) 
-                  : (Array.isArray(result) && result.length > 0 
-                    ? Object.keys(result[0]) 
-                    : [])),
-                executionTime,
-                status: 'completed'
+        setQueryResults(prev => prev.map(res => {
+          if (res.id === resultId) {
+            let resultData: Record<string, unknown>[] = [];
+            let resultColumns: string[] = [];
+            let isSelect = true;
+            let affectedRows: number | undefined;
+            
+            if (Array.isArray(result)) {
+              // Result is an array of records
+              resultData = result;
+              if (result.length > 0) {
+                resultColumns = Object.keys(result[0]);
               }
-            : res
-        ));
+            } else {
+              // Result is an object with possible properties like rows, data, columns
+              if (result.rows) {
+                resultData = result.rows as Record<string, unknown>[];
+              } else if (result.data) {
+                resultData = result.data as Record<string, unknown>[];
+              }
+              
+              if (result.columns) {
+                resultColumns = result.columns as string[];
+              } else if (resultData.length > 0) {
+                resultColumns = Object.keys(resultData[0]);
+              }
+              
+              // Handle non-SELECT queries
+              if (result.isSelect === false) {
+                isSelect = false;
+              }
+              
+              if (result.affectedRows !== undefined) {
+                affectedRows = result.affectedRows as number;
+              }
+            }
+            
+            return { 
+              ...res,
+              data: resultData,
+              columns: resultColumns,
+              executionTime,
+              status: 'completed',
+              isSelect,
+              affectedRows
+            };
+          }
+          return res;
+        }));
       } catch (err: unknown) {
         console.error('Query execution error:', err);
         const executionTime = stopTimer();
@@ -300,11 +364,6 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
               }
             : res
         ));
-      }
-      
-      // Restart timer for next query
-      if (i < queries.length - 1) {
-        startTimer();
       }
     }
     
@@ -333,19 +392,15 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
           : res
       ));
       
-    } catch (err: any) {
-      setError(err.message || 'Failed to stop query execution');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Failed to stop query execution');
     }
   };
   
   // Handle editor selection change
   const handleSelectionChange = (text: string) => {
     setSelectedText(text);
-  };
-  
-  // Handle tab change
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTabIndex(newValue);
   };
   
   // Open save query modal
@@ -458,26 +513,14 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
       });
   };
   
-  // Handle export menu open
-  const handleExportMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setExportMenuAnchor(event.currentTarget);
-  };
-  
-  // Handle export menu close
-  const handleExportMenuClose = () => {
-    setExportMenuAnchor(null);
-  };
-  
   // Export current result in various formats
   const exportResult = (format: 'csv' | 'json' | 'sql') => {
-    handleExportMenuClose();
-    
     // If no active tab or no results, do nothing
-    if (activeTabIndex >= queryResults.length || !queryResults[activeTabIndex]) {
+    if (activeResultIndex === null || !queryResults[activeResultIndex]) {
       return;
     }
     
-    const result = queryResults[activeTabIndex];
+    const result = queryResults[activeResultIndex];
     
     // If no data or columns, do nothing
     if (!result.data.length || !result.columns.length) {
@@ -499,13 +542,13 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
             // Handle null, undefined and different types
             if (value === null || value === undefined) {
               return '';
-            } else if (typeof value === 'object') {
+            } 
+            if (typeof value === 'object') {
               return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
-            } else {
-              return typeof value === 'string' && (value.includes(',') || value.includes('"'))
-                ? `"${value.replace(/"/g, '""')}"`
-                : String(value);
             }
+            return typeof value === 'string' && (value.includes(',') || value.includes('"'))
+              ? `"${value.replace(/"/g, '""')}"`
+              : String(value);
           }).join(',');
         }).join('\n');
         
@@ -515,10 +558,10 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
       } else if (format === 'json') {
         // Create JSON content
         const jsonData = result.data.map(row => {
-          const rowObject: Record<string, any> = {};
-          result.columns.forEach(column => {
+          const rowObject: Record<string, unknown> = {};
+          for (const column of result.columns) {
             rowObject[column] = row[column];
-          });
+          }
           return rowObject;
         });
         
@@ -529,22 +572,24 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
         // Create SQL INSERT statements
         const tableName = 'exported_data';
         
-        let insertStatements = [];
+        const insertStatements = [];
         for (const row of result.data) {
           const values = result.columns.map(column => {
             const value = row[column];
             
             if (value === null || value === undefined) {
               return 'NULL';
-            } else if (typeof value === 'string') {
+            } 
+            if (typeof value === 'string') {
               return `'${value.replace(/'/g, "''")}'`;
-            } else if (typeof value === 'boolean') {
+            } 
+            if (typeof value === 'boolean') {
               return value ? '1' : '0';
-            } else if (typeof value === 'object') {
+            } 
+            if (typeof value === 'object') {
               return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
-            } else {
-              return String(value);
-            }
+            } 
+            return String(value);
           });
           
           insertStatements.push(
@@ -552,13 +597,14 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
           );
         }
         
-        content = `-- Export from Date Crunch\n` +
-                 `-- Table structure\n` +
-                 `CREATE TABLE ${tableName} (\n` +
-                 result.columns.map(col => `  ${col} TEXT`).join(',\n') +
-                 '\n);\n\n' +
-                 '-- Data\n' +
-                 insertStatements.join('\n');
+        content = `-- Export from Date Crunch
+-- Table structure
+CREATE TABLE ${tableName} (
+${result.columns.map(col => `  ${col} TEXT`).join(',\n')}
+);
+
+-- Data
+${insertStatements.join('\n')}`;
                  
         fileType = 'text/plain;charset=utf-8;';
         fileExtension = 'sql';
@@ -574,8 +620,9 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
       link.click();
       document.body.removeChild(link);
       
-    } catch (err: any) {
-      setError(err.message || `Failed to export as ${format.toUpperCase()}`);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || `Failed to export as ${format.toUpperCase()}`);
     }
   };
   
@@ -585,54 +632,86 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
       return null;
     }
     
+    // Ensure activeResultIndex is valid
+    const validIndex = activeResultIndex !== null && 
+                      activeResultIndex >= 0 && 
+                      activeResultIndex < queryResults.length 
+                        ? activeResultIndex 
+                        : queryResults.length - 1;
+    
     return (
-      <Box className="border-b border-gray-200 bg-gray-50">
+      <div className="border-b border-border">
         <Tabs 
-          value={activeTabIndex} 
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
+          value={validIndex.toString()}
+          onValueChange={(value) => {
+            setActiveResultIndex(Number(value));
+          }}
           className="min-h-[48px]"
         >
-          {queryResults.map((result, index) => {
-            const isRunning = result.status === 'running';
-            const hasError = result.status === 'error';
-            const isSuccess = result.status === 'completed';
-            
-            return (
-              <Tab 
-                key={result.id}
-                label={
-                  <div className="flex items-center space-x-2 py-1">
-                    {isRunning && (
-                      <CircularProgress size={16} thickness={4} className="text-blue-500" />
+          <TabsList className="bg-transparent w-full h-full flex overflow-auto scrollbar-hide gap-0.5 rounded-none p-0 pl-1">
+            {queryResults.map((result, index) => {
+              // Format the query text for display (truncate and clean up)
+              const displayQuery = result.sql
+                .replace(/\s+/g, ' ')
+                .trim()
+                .substring(0, 30) + (result.sql.length > 30 ? '...' : '');
+                
+              return (
+                <TabsTrigger 
+                  key={result.id}
+                  value={index.toString()}
+                  className="flex items-center gap-2 py-1.5 px-3 h-9 rounded-sm rounded-b-none border-border border-b-0 data-[state=active]:bg-background data-[state=active]:border data-[state=active]:border-b-0 data-[state=active]:border-t-2 data-[state=active]:border-t-primary relative group"
+                >
+                  <div className="flex items-center">
+                    {result.status === 'running' ? (
+                      <div className="animate-spin h-3.5 w-3.5 border-2 border-primary border-t-transparent rounded-full mr-2" />
+                    ) : result.status === 'error' ? (
+                      <FiAlertTriangle className="text-destructive size-3.5 mr-2" />
+                    ) : (
+                      <FiCheckCircle className="text-primary size-3.5 mr-2" />
                     )}
-                    {hasError && (
-                      <FiAlertTriangle size={16} className="text-red-500" />
-                    )}
-                    {isSuccess && (
-                      <FiCheckCircle size={16} className="text-green-500" />
-                    )}
-                    <span className="max-w-[150px] truncate">
-                      {result.sql.substring(0, 20)}{result.sql.length > 20 ? '...' : ''}
+                    
+                    <span className="max-w-[150px] truncate text-xs font-medium">
+                      {displayQuery}
                     </span>
-                    {!isRunning && (
-                      <span className="text-xs text-gray-500 font-mono">
+                    
+                    {result.executionTime && (
+                      <span className="text-xs text-muted-foreground font-mono ml-2">
                         {formatExecutionTime(result.executionTime)}
                       </span>
                     )}
                   </div>
-                }
-                className={`
-                  ${hasError ? 'text-red-600 border-b-red-500' : ''}
-                  ${isSuccess ? 'text-blue-600 border-b-blue-500' : ''}
-                  ${isRunning ? 'text-blue-500 border-b-blue-300' : ''}
-                `}
-              />
-            );
-          })}
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 p-0 absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      
+                      // Remove tab
+                      const newResults = [...queryResults];
+                      newResults.splice(index, 1);
+                      setQueryResults(newResults);
+                      
+                      // Update active tab
+                      if (activeResultIndex !== null) {
+                        if (index === activeResultIndex) {
+                          setActiveResultIndex(newResults.length > 0 ? Math.min(index, newResults.length - 1) : null);
+                        } else if (index < activeResultIndex) {
+                          setActiveResultIndex(activeResultIndex - 1);
+                        }
+                      }
+                    }}
+                  >
+                    <IoClose className="size-3" />
+                  </Button>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
         </Tabs>
-      </Box>
+      </div>
     );
   };
   
@@ -640,77 +719,71 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
   const renderActiveResult = () => {
     if (queryResults.length === 0) {
       return (
-        <Box className="flex-grow flex items-center justify-center bg-gray-50 p-8">
-          <div className="text-center">
-            <FiCode size={40} className="text-gray-300 mx-auto mb-4" />
-            <Typography variant="h6" className="text-gray-600 mb-2">
-              Run a query to see results
-            </Typography>
-            <Typography variant="body2" className="text-gray-500 max-w-md">
-              Write SQL in the editor above and click Execute or press Ctrl+Enter
-            </Typography>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center text-muted-foreground">
+            <p>No query results yet</p>
+            <p className="text-sm mt-1">Run a query to see results here</p>
           </div>
-        </Box>
+        </div>
       );
     }
     
-    const activeResult = queryResults[activeTabIndex];
+    const activeResult = activeResultIndex !== null ? queryResults[activeResultIndex] : null;
     
     if (!activeResult) {
-      return null;
+      return (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center text-muted-foreground">
+            <p>No active result selected</p>
+            <p className="text-sm mt-1">Please select a tab to view results</p>
+          </div>
+        </div>
+      );
     }
-    
-    console.log('Active result:', activeResult); // Add logging to debug
     
     // If query is running
     if (activeResult.status === 'running') {
       return (
-        <Box className="flex-grow flex flex-col items-center justify-center bg-blue-50 p-8">
-          <CircularProgress size={48} className="mb-4" />
-          <Typography variant="h6" className="mb-2 text-blue-800">
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <div className="animate-spin h-12 w-12 border-2 border-primary border-t-transparent rounded-full mb-4" />
+          <p className="text-center text-muted-foreground">
             Executing query...
-          </Typography>
-          <Typography variant="body2" className="text-blue-600 font-mono">
+          </p>
+          <p className="text-center text-muted-foreground text-sm">
             {formatExecutionTime(elapsedTime)}
-          </Typography>
-        </Box>
+          </p>
+        </div>
       );
     }
     
     // If query has error
     if (activeResult.error) {
       return (
-        <Paper 
-          elevation={0}
-          className="m-4 p-4 bg-red-50 border border-red-200 rounded"
-        >
-          <Typography variant="subtitle1" className="text-red-800 font-medium mb-2">
+        <div className="m-4 p-4 bg-red-50 border border-red-200 rounded">
+          <p className="text-red-800 font-medium mb-2">
             Error executing query
-          </Typography>
-          <Typography variant="body2" className="text-red-700 font-mono whitespace-pre-wrap">
+          </p>
+          <p className="text-red-700 font-mono whitespace-pre-wrap">
             {activeResult.error}
-          </Typography>
-        </Paper>
+          </p>
+        </div>
       );
     }
     
     // If non-SELECT query with affected rows
-    if (!activeResult.isSelect && activeResult.affectedRows !== undefined) {
+    if (activeResult.isSelect === false && activeResult.affectedRows !== undefined) {
       return (
-        <Paper 
-          elevation={0}
-          className="m-4 p-4 bg-green-50 border border-green-200 rounded"
-        >
-          <Typography variant="subtitle1" className="text-green-800 font-medium mb-2">
+        <div className="m-4 p-4 bg-green-50 border border-green-200 rounded">
+          <p className="text-green-800 font-medium mb-2">
             Query executed successfully
-          </Typography>
-          <Typography variant="body1" className="text-green-700">
+          </p>
+          <p className="text-green-700">
             {activeResult.affectedRows} {activeResult.affectedRows === 1 ? 'row' : 'rows'} affected
-          </Typography>
-          <Typography variant="caption" className="text-green-600 mt-2 block">
-            Execution time: {formatExecutionTime(activeResult.executionTime)}
-          </Typography>
-        </Paper>
+          </p>
+          <p className="text-green-600 mt-2 block">
+            Execution time: {formatExecutionTime(activeResult.executionTime || 0)}
+          </p>
+        </div>
       );
     }
     
@@ -718,36 +791,33 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
     // Check that we have data to display
     if (activeResult.data && activeResult.columns) {
       return (
-        <Box className="flex-grow">
+        <div className="flex-1">
           <QueryResults 
             data={activeResult.data}
             columns={activeResult.columns}
             loading={false}
           />
-        </Box>
-      );
-    } else {
-      // Handle the case where we have no data but no error
-      return (
-        <Paper 
-          elevation={0}
-          className="m-4 p-4 bg-blue-50 border border-blue-200 rounded"
-        >
-          <Typography variant="subtitle1" className="text-blue-800 font-medium mb-2">
-            Query executed successfully
-          </Typography>
-          <Typography variant="body1" className="text-blue-700">
-            No data returned
-          </Typography>
-        </Paper>
+        </div>
       );
     }
+    
+    // Handle the case where we have no data but no error
+    return (
+      <div className="m-4 p-4 bg-blue-50 border border-blue-200 rounded">
+        <p className="text-blue-800 font-medium mb-2">
+          Query executed successfully
+        </p>
+        <p className="text-blue-700">
+          No data returned
+        </p>
+      </div>
+    );
   };
 
   return (
-    <Box className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Saved Queries Sidebar - Wider width */}
-      <Box className="w-80 flex-none border-r border-gray-200 bg-white overflow-auto saved-queries-component">
+      <div className="w-80 flex-none border-r border-gray-200 bg-white overflow-auto saved-queries-component">
         <SavedQueries 
           connectionId={connectionId}
           onSelectQuery={(savedSql, queryName) => loadQuery(savedSql, queryName)}
@@ -758,21 +828,18 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
           error={savedQueriesError}
           onRefetchQueries={fetchSavedQueries}
         />
-      </Box>
+      </div>
       
       {/* Main Content Area - Reduced padding, just the editor */}
-      <Box className="flex-1 flex bg-gray-100 overflow-hidden">
+      <div className="flex-1 flex bg-gray-100 overflow-hidden">
         {/* Content Container with no max-width */}
-        <Box className="w-full flex flex-col overflow-hidden bg-white">
+        <div className="w-full flex flex-col overflow-hidden bg-white">
           {/* Header with actions */}
-          <Box className=" border-b border-gray-200 shadow-sm flex-none">
+          <div className="border-b border-gray-200 shadow-sm flex-none">
             <div className="flex justify-between items-center p-2">
-              <Typography 
-                variant="h6" 
-                className="text-gray-800 font-semibold"
-              >
+              <h2 className="text-gray-800 font-semibold text-lg">
                 SQL Query Editor
-              </Typography>
+              </h2>
               
               <div className="flex items-center gap-2">
                 {/* Currently executing timer */}
@@ -787,120 +854,128 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
                 
                 {/* Execute button */}
                 {!isExecuting ? (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<FiPlay />}
-                    onClick={() => executeQuery(false)}
-                    disabled={!sql.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-700 shadow-md"
-                  >
-                    Execute
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => executeQuery(false)}
+                          disabled={!sql.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-700 shadow-md"
+                        >
+                          <FiPlay className="mr-1 h-4 w-4" />
+                          Execute
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Execute SQL query (Shift+Enter)</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : (
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={<FiStopCircle />}
-                    onClick={stopExecution}
-                    className="bg-red-600 hover:bg-red-700 shadow-md"
-                  >
-                    Stop
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="destructive"
+                          size="sm"
+                          onClick={stopExecution}
+                          className="shadow-md"
+                        >
+                          <FiStopCircle className="mr-1 h-4 w-4" />
+                          Stop
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Stop query execution</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 
                 {/* Execute Selection button - show only when text is selected */}
                 {selectedText && (
-                  <Tooltip title="Execute selected SQL">
-                    <Button
-                      variant="outlined"
-                      startIcon={<FiChevronRight />}
-                      onClick={() => executeQuery(true)}
-                      disabled={isExecuting}
-                      className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                    >
-                      Run Selection
-                    </Button>
-                  </Tooltip>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => executeQuery(true)}
+                          disabled={isExecuting}
+                          className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                        >
+                          <FiChevronRight className="mr-1 h-4 w-4" />
+                          Run Selection
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Execute selected SQL (Cmd+Enter)</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 
                 {/* Save button */}
-                <Button
-                  variant="outlined"
-                  startIcon={<FiSave />}
-                  onClick={openSaveModal}
-                  disabled={!sql.trim() || isExecuting}
-                  className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                >
-                  Save
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openSaveModal}
+                        disabled={!sql.trim() || isExecuting}
+                        className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                      >
+                        <FiSave className="mr-1 h-4 w-4" />
+                        Save
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Save query</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 
                 {/* Copy button */}
-                <Tooltip title="Copy to clipboard">
-                  <IconButton
-                    onClick={copyQuery}
-                    disabled={!sql.trim() || isExecuting}
-                    className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
-                    size="small"
-                  >
-                    <FiCopy size={18} />
-                  </IconButton>
-                </Tooltip>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={copyQuery}
+                        disabled={!sql.trim() || isExecuting}
+                        className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8"
+                      >
+                        <FiCopy className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy to clipboard</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 
                 {/* Export button - only enabled when there are results */}
-                <Tooltip title="Export results">
-                  <span>
-                    <IconButton 
-                      onClick={handleExportMenuOpen}
-                      disabled={!queryResults.length || activeTabIndex >= queryResults.length || !queryResults[activeTabIndex].data.length}
-                      className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
-                      size="small"
-                    >
-                      <FiDownload size={18} />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                
-                {/* Export menu */}
-                <Menu
-                  anchorEl={exportMenuAnchor}
-                  open={Boolean(exportMenuAnchor)}
-                  onClose={handleExportMenuClose}
-                  className="mt-1"
-                >
-                  <MenuItem 
-                    onClick={() => exportResult('csv')}
-                    className="py-2 px-4 hover:bg-blue-50"
-                  >
-                    <FiFileText className="mr-2 text-blue-600" size={16} />
-                    Export as CSV
-                  </MenuItem>
-                  <MenuItem 
-                    onClick={() => exportResult('json')}
-                    className="py-2 px-4 hover:bg-blue-50"
-                  >
-                    <FiCode className="mr-2 text-blue-600" size={16} />
-                    Export as JSON
-                  </MenuItem>
-                  <MenuItem 
-                    onClick={() => exportResult('sql')}
-                    className="py-2 px-4 hover:bg-blue-50"
-                  >
-                    <FiDatabase className="mr-2 text-blue-600" size={16} />
-                    Export as SQL
-                  </MenuItem>
-                </Menu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => exportResult('csv')}
+                        disabled={!queryResults.length || activeResultIndex === null || !queryResults[activeResultIndex]?.data.length}
+                        className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8"
+                      >
+                        <FiDownload className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Export as CSV</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
-          </Box>
+          </div>
           
           {/* Main content area with reduced padding */}
-          <Box className="flex flex-col flex-grow overflow-hidden">
+          <div className="flex flex-col flex-grow overflow-hidden">
             {/* Query editor with fixed height and minimal margin */}
-            <Box className="flex flex-col h-[300px] m-1">
+            <div className="flex flex-col h-[300px] m-1">
               {/* Query editor container */}
-              <Box className="flex-grow border border-gray-200 rounded-md shadow-sm bg-white overflow-hidden">
-                <QueryEditor 
+              <div className="flex-grow border border-gray-200 rounded-md shadow-sm bg-white overflow-hidden">
+                <QueryEditor
                   value={sql}
                   onChange={setSql}
                   onExecute={() => executeQuery(false)}
@@ -909,16 +984,14 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
                   ref={editorRef}
                   connectionId={connectionId}
                 />
-              </Box>
+              </div>
               
               {/* Error message if any */}
               {error && (
-                <Paper 
-                  elevation={0}
-                  className={`mt-2 p-2 ${
-                    error.includes('copied to clipboard') 
-                      ? 'bg-green-50 border-green-200 text-green-700' 
-                      : 'bg-red-50 border-red-200 text-red-700'
+                <div className={`mt-2 p-2 ${
+                  error.includes('copied to clipboard') 
+                    ? 'bg-green-50 border-green-200 text-green-700' 
+                    : 'bg-red-50 border-red-200 text-red-700'
                   } border rounded-md`}
                 >
                   <div className="flex items-center">
@@ -927,38 +1000,48 @@ function QueryPanel({ connectionId }: QueryPanelProps) {
                     ) : (
                       <FiAlertTriangle className="mr-2" size={16} />
                     )}
-                    <Typography variant="body2">
+                    <p className="text-sm">
                       {error}
-                    </Typography>
+                    </p>
                   </div>
-                </Paper>
+                </div>
               )}
-            </Box>
+            </div>
             
             {/* Results area with minimal margin */}
-            <Box className="flex flex-col h-[calc(100vh-500px)] min-h-[400px] m-1 mt-2 overflow-hidden border border-gray-200 rounded-md shadow-sm bg-white">
+            <div className="flex flex-col h-[calc(100vh-500px)] min-h-[400px] m-1 mt-2 overflow-hidden border border-gray-200 rounded-md shadow-sm bg-white">
               {/* Result tabs - Fixed */}
-              <Box className="flex-none border-b border-gray-200">
+              <div className="flex-none border-b border-gray-200">
                 {renderResultTabs()}
-              </Box>
+              </div>
               
               {/* Results content - Scrollable */}
-              <Box className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden">
                 {renderActiveResult()}
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      </Box>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Save Query Modal */}
-      <SaveQueryModal
-        open={saveModalOpen}
-        onClose={() => setSaveModalOpen(false)}
-        onSave={saveQuery}
-        sql={sql}
-      />
-    </Box>
+      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Query</DialogTitle>
+            <DialogDescription>
+              Enter a name and description for your query
+            </DialogDescription>
+          </DialogHeader>
+          <SaveQueryModal
+            open={saveModalOpen}
+            onClose={() => setSaveModalOpen(false)}
+            onSave={saveQuery}
+            sql={sql}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

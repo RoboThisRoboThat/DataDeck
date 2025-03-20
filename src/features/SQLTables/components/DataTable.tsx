@@ -1,17 +1,18 @@
 import { useRef, useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
 import { 
-  Box, 
-  Paper, 
-  Tooltip, 
-  Typography, 
-  useTheme,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  LinearProgress,
-  IconButton
-} from '@mui/material';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { FiFilter, FiArrowUp, FiArrowDown, FiEdit2, FiCopy } from 'react-icons/fi';
 import type { MouseEvent } from 'react';
 import type { TableDataRow } from "../types";
@@ -28,6 +29,7 @@ import {
   fetchPrimaryKeys,
   setEditingCell
 } from '../../../store/slices/tablesSlice';
+import { cn } from "@/lib/utils";
 
 // Create a custom event for filter clicks
 const FILTER_CLICK_EVENT = 'dataTableFilterClick';
@@ -41,7 +43,6 @@ const DataTable = ({
   tableName,
   connectionId
 }: DataTableProps) => {
-  const theme = useTheme();
   const dispatch = useAppDispatch();
   const tableRef = useRef<HTMLDivElement>(null);
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
@@ -80,10 +81,6 @@ const DataTable = ({
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filterColumn, setFilterColumn] = useState('');
   
-  // Column menu state
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [currentColumn, setCurrentColumn] = useState('');
-  
   // Track previous values to detect changes
   const prevTableNameRef = useRef(tableName);
   
@@ -121,18 +118,12 @@ const DataTable = ({
   
   // Log when primary keys change
   useEffect(() => {
-    console.log("Primary keys for table " + tableName + ":", primaryKeys);
+    console.log(`Primary keys for table ${tableName}:`, primaryKeys);
   }, [primaryKeys, tableName]);
-  
-  // Handle column menu open
-  const handleColumnMenuOpen = (event: MouseEvent<HTMLButtonElement>, column: string) => {
-    setAnchorEl(event.currentTarget);
-    setCurrentColumn(column);
-  };
   
   // Handle column menu close
   const handleColumnMenuClose = () => {
-    setAnchorEl(null);
+    // No longer using anchorEl so this is simplified
   };
   
   // Listen for filter click events from the column menu
@@ -239,7 +230,7 @@ const DataTable = ({
     const primaryKeyColumn = primaryKeys[0]; // Using the first primary key
     const primaryKeyValue = row[primaryKeyColumn];
     
-    console.log("Using primary key column: " + primaryKeyColumn + ", value: " + primaryKeyValue);
+    console.log(`Using primary key column: ${primaryKeyColumn}, value: ${primaryKeyValue}`);
 
     dispatch(setEditingCell({
       tableName,
@@ -302,68 +293,85 @@ const DataTable = ({
 
   // Render the table header
   const renderTableHeader = () => (
-    <div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-50">
+    <div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-100 shadow-sm">
       {columns.map(column => {
         const width = getCellWidth(column);
+        const isPrimaryKey = primaryKeys.includes(column);
+        const isColumnSorted = sortConfig.column === column;
+        
         return (
           <div 
             key={`header-${column}`}
-            className="flex items-center justify-between p-3 font-medium text-gray-700"
+            className={`flex items-center justify-between px-3 py-3 font-medium ${
+              isPrimaryKey ? 'bg-blue-50/70 text-blue-800' : 'text-gray-700'
+            } ${
+              isColumnSorted ? 'bg-purple-50/80' : ''
+            }`}
             style={{ 
               width,
               minWidth: width,
               maxWidth: width,
-              borderRight: '1px solid rgba(224, 224, 224, 0.4)'
+              borderRight: '1px solid rgba(224, 224, 224, 0.6)'
             }}
           >
-            <Tooltip title={column} arrow placement="top">
-              <Typography
-                variant="subtitle2"
-                noWrap
-                className="max-w-[200px] truncate"
-              >
-                {column}
-              </Typography>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="max-w-[200px] truncate font-medium">
+                    {column}
+                    {isPrimaryKey && (
+                      <span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">PK</span>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{column}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            {/* Sort indicator */}
+            {isColumnSorted && (
+              <div className="mx-1 text-purple-700">
+                {sortConfig.direction === 'asc' ? (
+                  <FiArrowUp size={14} />
+                ) : (
+                  <FiArrowDown size={14} />
+                )}
+              </div>
+            )}
             
             {/* Filter icon for each column */}
-            <button
-              type="button"
-              className="p-1 rounded-full hover:bg-gray-200 focus:outline-none"
-              onClick={(e: MouseEvent<HTMLButtonElement>) => handleColumnMenuOpen(e, column)}
-              aria-label={`Filter ${column}`}
-            >
-              <FiFilter size={16} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 p-0 ml-1 text-gray-500 hover:text-gray-800 hover:bg-gray-200/60 rounded-sm"
+                  onClick={(e: MouseEvent<HTMLButtonElement>) => e.stopPropagation()}
+                >
+                  <FiFilter size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleSortChange(column, 'asc')}>
+                  <FiArrowUp className="mr-2 h-4 w-4" />
+                  <span>Sort Ascending</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange(column, 'desc')}>
+                  <FiArrowDown className="mr-2 h-4 w-4" />
+                  <span>Sort Descending</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleFilterClick(column)}>
+                  <FiFilter className="mr-2 h-4 w-4" />
+                  <span>Filter</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       })}
-      
-      {/* Column Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleColumnMenuClose}
-      >
-        <MenuItem onClick={() => handleSortChange(currentColumn, 'asc')}>
-          <ListItemIcon>
-            <FiArrowUp size={16} />
-          </ListItemIcon>
-          <ListItemText>Sort Ascending</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => handleSortChange(currentColumn, 'desc')}>
-          <ListItemIcon>
-            <FiArrowDown size={16} />
-          </ListItemIcon>
-          <ListItemText>Sort Descending</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => handleFilterClick(currentColumn)}>
-          <ListItemIcon>
-            <FiFilter size={16} />
-          </ListItemIcon>
-          <ListItemText>Filter</ListItemText>
-        </MenuItem>
-      </Menu>
     </div>
   );
 
@@ -371,8 +379,8 @@ const DataTable = ({
   const renderTableRow = (row: TableDataRow, rowIndex: number) => (
     <div 
       key={`row-${rowIndex}`}
-      className={`flex border-b border-gray-100 ${
-        hoveredRow === rowIndex ? 'bg-blue-50' : rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+      className={`flex border-b border-gray-100 transition-colors duration-150 ${
+        hoveredRow === rowIndex ? 'bg-blue-50/80' : rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'
       }`}
       onMouseEnter={() => setHoveredRow(rowIndex)}
       onMouseLeave={() => setHoveredRow(null)}
@@ -389,10 +397,17 @@ const DataTable = ({
         const isCellHovered = hoveredCell?.rowIndex === rowIndex && hoveredCell?.columnName === column;
         const width = getCellWidth(column);
         
+        // Special styling based on value type
+        const isNull = cellValue === null || cellValue === undefined;
+        const isNumber = typeof cellValue === 'number';
+        const isBoolean = typeof cellValue === 'boolean';
+        
         return (
           <div 
             key={`cell-${rowIndex}-${column}`}
-            className="p-3 overflow-hidden text-gray-900 relative"
+            className={`overflow-hidden relative transition-colors duration-150 ${
+              isCellHovered ? 'bg-blue-50/80' : ''
+            }`}
             style={{ 
               width,
               minWidth: width,
@@ -402,60 +417,106 @@ const DataTable = ({
             onMouseEnter={() => setHoveredCell({ rowIndex, columnName: column })}
             onMouseLeave={() => setHoveredCell(null)}
           >
-            {isJson ? (
-              <JsonCell value={cellValue} />
-            ) : (
-              <Tooltip title="Click to copy" arrow placement="top">
-                <Typography 
-                  variant="body2" 
-                  noWrap 
-                  className="cursor-pointer hover:text-blue-600"
-                  onClick={() => handleCopyCellContent(cellValue)}
-                >
-                  {formatCellValue(cellValue)}
-                </Typography>
-              </Tooltip>
-            )}
+            <div className={`px-3 py-2.5 ${isPrimaryKey ? 'font-medium' : ''}`}>
+              {isJson ? (
+                <JsonCell value={cellValue} />
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className={`p-0 h-auto w-full justify-start font-normal truncate text-left ${
+                          isNull 
+                            ? 'text-gray-400 italic'
+                            : isPrimaryKey
+                              ? 'text-blue-700 font-medium'
+                              : isNumber
+                                ? 'text-emerald-700 font-mono text-sm'
+                                : isBoolean
+                                  ? 'text-purple-700'
+                                  : 'text-gray-800'
+                        }`}
+                        onClick={() => handleCopyCellContent(cellValue)}
+                        aria-label={`Copy value: ${formatCellValue(cellValue)}`}
+                      >
+                        {isNull ? (
+                          <span className="text-gray-400">NULL</span>
+                        ) : isBoolean ? (
+                          <span className={`py-0.5 px-2 text-xs rounded-full ${
+                            cellValue 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {cellValue ? 'true' : 'false'}
+                          </span>
+                        ) : (
+                          formatCellValue(cellValue)
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click to copy</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             
             {/* Cell action buttons */}
             {isCellHovered && (
               <div 
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-90 rounded shadow-sm flex"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/95 rounded-md shadow-md flex items-center p-0.5 border border-gray-100"
                 style={{ zIndex: 2 }}
               >
                 {/* Copy button */}
-                <Tooltip title="Copy to clipboard" arrow>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleCopyCellContent(cellValue)}
-                    className="text-gray-500 hover:text-blue-600"
-                  >
-                    <FiCopy size={14} />
-                  </IconButton>
-                </Tooltip>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleCopyCellContent(cellValue)}
+                      >
+                        <FiCopy size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Copy to clipboard</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 
                 {/* Edit button */}
-                <Tooltip 
-                  title={
-                    !primaryKeys.length 
-                      ? "Editing not available: Table has no primary key" 
-                      : isEditableCell 
-                        ? "Edit cell value" 
-                        : "Primary key cannot be edited"
-                  } 
-                  arrow
-                >
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => isEditableCell && handleCellEdit(rowIndex, column)}
-                      disabled={!primaryKeys.length || !isEditableCell}
-                      className={`text-gray-500 hover:text-blue-600 ${!primaryKeys.length || !isEditableCell ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <FiEdit2 size={14} />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-7 w-7 rounded-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50",
+                          (!primaryKeys.length || !isEditableCell) && "opacity-50 cursor-not-allowed"
+                        )}
+                        onClick={() => isEditableCell && handleCellEdit(rowIndex, column)}
+                        disabled={!primaryKeys.length || !isEditableCell}
+                      >
+                        <FiEdit2 size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>
+                        {!primaryKeys.length 
+                          ? "Editing not available: Table has no primary key" 
+                          : isEditableCell 
+                            ? "Edit cell value" 
+                            : "Primary key cannot be edited"
+                        }
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             )}
           </div>
@@ -466,68 +527,37 @@ const DataTable = ({
 
   // Render empty state
   const renderEmptyState = () => (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center',
-        p: 4,
-        height: '300px',
-        width: '100%'
-      }}
-    >
-      <Typography variant="h6" color="text.secondary" gutterBottom>
+    <div className="flex flex-col items-center justify-center p-4 h-[300px] w-full">
+      <p className="text-lg font-semibold text-gray-500 mb-2">
         No data found
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
+      </p>
+      <p className="text-sm text-gray-500">
         {Object.keys(filters).length > 0 
           ? 'Try adjusting your filters to see more results'
           : 'This table appears to be empty'}
-      </Typography>
-    </Box>
+      </p>
+    </div>
   );
 
   // Render loading state
   const renderLoadingState = () => (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center',
-        p: 4,
-        height: '300px',
-        width: '100%'
-      }}
-    >
-      <Typography variant="h6" color="text.secondary" gutterBottom>
+    <div className="flex flex-col items-center justify-center p-4 h-[300px] w-full">
+      <p className="text-lg font-semibold text-gray-500 mb-2">
         Loading data...
-      </Typography>
-    </Box>
+      </p>
+    </div>
   );
 
   // Render error state
   const renderErrorState = () => (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center',
-        p: 4,
-        height: '300px',
-        width: '100%',
-        color: 'error.main'
-      }}
-    >
-      <Typography variant="h6" color="error" gutterBottom>
+    <div className="flex flex-col items-center justify-center p-4 h-[300px] w-full text-red-500">
+      <p className="text-lg font-semibold mb-2">
         Error Loading Data
-      </Typography>
-      <Typography variant="body2" color="error.main">
+      </p>
+      <p className="text-sm">
         {error}
-      </Typography>
-    </Box>
+      </p>
+    </div>
   );
 
   // Render table header with pagination and active filters/sort
@@ -546,14 +576,14 @@ const DataTable = ({
       const activeFilters = Object.entries(filters).map(([column, filter]) => (
         <div
           key={`filter-${column}`}
-          className="flex items-center bg-blue-50 text-blue-700 text-sm rounded-full px-3 py-1 mr-2 mb-2"
+          className="flex items-center text-sm rounded-full mr-2 mb-2 border border-blue-200 bg-blue-50 text-blue-700 px-3 py-1 gap-1"
         >
           <span className="font-medium mr-1">{column}</span>
           <span className="mr-2">{formatFilterDisplay(filter.operator, filter.value)}</span>
           <button
             type="button"
             onClick={() => handleRemoveFilter(column)}
-            className="hover:bg-blue-100 rounded-full p-1"
+            className="hover:bg-blue-100 rounded-full p-1 flex items-center justify-center"
             aria-label={`Remove filter for ${column}`}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -566,7 +596,7 @@ const DataTable = ({
       const sortChip = sortConfig.column && sortConfig.direction && (
         <div
           key="sort-chip"
-          className="flex items-center bg-purple-50 text-purple-700 text-sm rounded-full px-3 py-1 mr-2 mb-2"
+          className="flex items-center text-sm rounded-full mr-2 mb-2 border border-purple-200 bg-purple-50 text-purple-700 px-3 py-1 gap-1"
         >
           <span className="font-medium mr-1">{sortConfig.column}</span>
           <span className="mr-2 flex items-center">
@@ -580,7 +610,7 @@ const DataTable = ({
           <button
             type="button"
             onClick={handleRemoveSort}
-            className="hover:bg-purple-100 rounded-full p-1"
+            className="hover:bg-purple-100 rounded-full p-1 flex items-center justify-center"
             aria-label="Remove sort"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -624,28 +654,30 @@ const DataTable = ({
                 {totalRows.toLocaleString()} rows
               </span>
               <div className="flex space-x-1">
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="icon"
                   onClick={() => handlePageChange(pagination.page - 1)}
                   disabled={pagination.page === 0}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Previous page"
+                  className="h-8 w-8"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
                   onClick={() => handlePageChange(pagination.page + 1)}
                   disabled={(pagination.page + 1) * pagination.rowsPerPage >= totalRows}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Next page"
+                  className="h-8 w-8"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -661,42 +693,21 @@ const DataTable = ({
 
   return (
     <>
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          border: `1px solid ${theme.palette.divider}`,
-          borderRadius: 1,
-          position: 'relative'
-        }}
-      >
-        {/* Show LinearProgress at the top when loading */}
+      <div className="h-full flex flex-col overflow-hidden border border-gray-200 rounded-md relative">
+        {/* Show loading indicator at the top when loading */}
         {loading && (
-          <LinearProgress
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 1000,
-            }}
-          />
+          <div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200">
+            <div className="h-full bg-blue-600 animate-progress-indeterminate" />
+          </div>
         )}
 
         {/* Table header with pagination and filters */}
         {columns.length > 0 && renderTableHeaderControls()}
         
-        {/* Table container with virtual scrolling */}
-        <Box 
+        {/* Table container with custom scrolling div instead of ScrollArea */}
+        <div
           ref={tableRef}
-          sx={{ 
-            flexGrow: 1,
-            overflow: 'auto',
-            position: 'relative'
-          }}
+          className="flex-grow relative overflow-auto"
         >
           {/* Table header */}
           {columns.length > 0 && renderTableHeader()}
@@ -713,8 +724,8 @@ const DataTable = ({
           ) : (
             renderEmptyState()
           )}
-        </Box>
-      </Paper>
+        </div>
+      </div>
       
       {/* Filter Modal */}
       <FilterModal 

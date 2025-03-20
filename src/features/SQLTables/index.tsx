@@ -3,15 +3,15 @@ import TableList from './components/TableList';
 import TableTabs from './components/TableTabs';
 import DataTable from './components/DataTable';
 import QueryPanel from '../QueryPanel';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Button } from '../../components/ui/button';
 
 interface SQLTablesProps {
   connectionId: string;
-  onDisconnect: () => void;
+  onDisconnect: () => void; // Not currently used but kept for future implementation
 }
 
-function SQLTables({ connectionId, onDisconnect }: SQLTablesProps) {
+function SQLTables({ connectionId }: SQLTablesProps) {
   const [allTables, setAllTables] = useState<string[]>([]);
   const [tables, setTables] = useState<string[]>([]);
   const [activeTable, setActiveTable] = useState<string | null>(null);
@@ -98,86 +98,106 @@ function SQLTables({ connectionId, onDisconnect }: SQLTablesProps) {
   };
 
   return (
-    <div>
-      <Tabs value={currentActiveTab} onChange={(_, newValue) => setCurrentActiveTab(newValue)} aria-label="basic tabs example">
-          <Tab label="Tables" value="tables"  />
-          <Tab label="Query" value="query"  />
+    <div className="flex flex-col h-full">
+      <Tabs 
+        defaultValue="tables" 
+        value={currentActiveTab} 
+        onValueChange={setCurrentActiveTab}
+        className="flex-1 h-full flex flex-col"
+      >
+        <div className="border-b">
+          <TabsList className="w-full justify-start rounded-none px-2 h-11 bg-background">
+            <TabsTrigger 
+              value="tables" 
+              className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+            >
+              Tables
+            </TabsTrigger>
+            <TabsTrigger 
+              value="query" 
+              className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+            >
+              Query
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="tables" className="flex-1 flex h-full mt-0 border-none p-0">
+          <div className='flex flex-1 flex-row h-full' id='main-tables-container'>
+            <TableList 
+              tables={allTables}
+              openTables={tables}
+              activeTable={activeTable}
+              tableSearch={tableSearch}
+              setTableSearch={setTableSearch}
+              handleTableSelect={handleTableSelect}
+              handleKeyDown={handleKeyDown}
+            />
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              
+              {loading && (
+                <div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md dark:bg-blue-900/20 dark:border-blue-800/30 dark:text-blue-400">
+                  Loading tables...
+                </div>
+              )}
+              
+              {error && (
+                <div className="p-4 m-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-md dark:border-destructive/30 dark:text-destructive-foreground">
+                  {error}
+                  <div className="mt-2">
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadTables(connectionId)}
+                      className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 dark:bg-destructive/20 dark:border-destructive/30 dark:text-destructive-foreground"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabs Bar */}
+              <TableTabs 
+                tables={tables}
+                activeTable={activeTable}
+                setActiveTable={setActiveTable}
+                handleCloseTable={handleCloseTable}
+              />
+              
+              {/* Table Content */}
+              <div className="flex-1 overflow-hidden">
+                { activeTable ? (
+                  <div className="h-full flex flex-col">
+                    {/* Data Table */}
+                    <div className="flex-1 overflow-auto">
+                      <DataTable 
+                        tableName={activeTable} 
+                        connectionId={connectionId}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <p className="text-lg">Select a table from the sidebar to view its data</p>
+                      <p className="text-sm mt-2">{tables.length} tables available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="query" className="flex-1 h-full mt-0 border-none p-0">
+          <div id='query-panel-container' className="h-full">
+            <QueryPanel connectionId={connectionId} />
+          </div>
+        </TabsContent>
       </Tabs>
-
-      {currentActiveTab === 'tables' && (
-    <div className='flex flex-1 flex-row h-full' id='main-tables-container'>
-        <TableList 
-        tables={allTables}
-        openTables={tables}
-        activeTable={activeTable}
-        tableSearch={tableSearch}
-        setTableSearch={setTableSearch}
-        handleTableSelect={handleTableSelect}
-        handleKeyDown={handleKeyDown}
-      />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        
-        {loading && (
-          <div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
-            Loading tables...
-          </div>
-        )}
-        
-        {error && (
-          <div className="p-4 m-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
-            <div className="mt-2">
-              <button 
-                type="button"
-                onClick={() => loadTables(connectionId)}
-                className="px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs Bar */}
-        <TableTabs 
-          tables={tables}
-          activeTable={activeTable}
-          setActiveTable={setActiveTable}
-          handleCloseTable={handleCloseTable}
-        />
-        
-        {/* Table Content */}
-        <div className="flex-1 overflow-hidden">
-          { activeTable ? (
-            <div className="h-full flex flex-col">
-              {/* Data Table */}
-              <div className="flex-1 overflow-auto">
-                <DataTable 
-                  tableName={activeTable} 
-                  connectionId={connectionId}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <p className="text-lg">Select a table from the sidebar to view its data</p>
-                <p className="text-sm mt-2">{tables.length} tables available</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      </div>
-      )}
-
-      {currentActiveTab === 'query' && (
-        <div id='query-panel-container'>
-          <QueryPanel connectionId={connectionId} />
-        </div>
-      )}
     </div>
   );
 }

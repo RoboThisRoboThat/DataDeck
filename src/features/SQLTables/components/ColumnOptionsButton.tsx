@@ -1,6 +1,7 @@
-import type {  MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { IoOptions } from 'react-icons/io5';
 import type { SortConfig } from '../types';
+import { Button } from '../../../components/ui/button';
 
 interface ColumnOptionsButtonProps {
   column: string;
@@ -20,15 +21,16 @@ const ColumnOptionsButton = ({
     filters[column];
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={onClick}
-      className={`p-1 rounded hover:bg-gray-200 ${
-        isActive ? 'text-blue-600' : 'text-gray-400'
+      className={`p-0 h-7 w-7 rounded hover:bg-muted ${
+        isActive ? 'text-primary' : 'text-muted-foreground'
       }`}
     >
       <IoOptions className="w-4 h-4" />
-    </button>
+    </Button>
   );
 };
 

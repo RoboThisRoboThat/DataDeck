@@ -1,5 +1,4 @@
 import React, { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
-import { Box } from '@mui/material';
 import Editor from '@monaco-editor/react';
 import type { OnMount, OnChange } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
@@ -384,16 +383,7 @@ const QueryEditor = forwardRef<any, QueryEditorProps>(({
   }));
 
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: '100%',
-      position: 'relative',
-      overflow: 'hidden',
-      borderRadius: 1,
-      '.monaco-editor': {
-        paddingTop: 1
-      }
-    }}>
+    <div className="w-full h-full relative overflow-hidden rounded">
       <Editor
         height="100%"
         defaultLanguage="sql"
@@ -441,7 +431,7 @@ const QueryEditor = forwardRef<any, QueryEditorProps>(({
           </div>
         }
       />
-    </Box>
+    </div>
   );
 });
 

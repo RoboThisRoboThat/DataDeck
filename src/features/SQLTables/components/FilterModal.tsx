@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  TextField, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem,
-  Typography
-} from '@mui/material';
-import  { type FilterOperator, FILTER_OPERATORS, FILTER_OPERATOR_LABELS } from '../types';
+import { FiX, FiFilter } from 'react-icons/fi';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { type FilterOperator, FILTER_OPERATORS, FILTER_OPERATOR_LABELS } from '../types';
 
 interface FilterModalProps {
   open: boolean;
@@ -46,9 +39,19 @@ const FilterModal = ({
     setError('');
   }, [currentFilter]);
 
+  const handleOperatorChange = (newOperator: string) => {
+    setOperator(newOperator as FilterOperator);
+    
+    // Clear value if the operator doesn't require a value
+    if (!requiresValue(newOperator as FilterOperator)) {
+      setValue('');
+    }
+  };
+
+  // Handle apply filter
   const handleApply = () => {
     // Validate based on operator
-    if (['IS NULL', 'IS NOT NULL'].includes(operator)) {
+    if (!requiresValue(operator)) {
       // These operators don't need a value
       onApply(column, operator, '');
       onClose();
@@ -64,8 +67,14 @@ const FilterModal = ({
     onClose();
   };
 
+  // Handle clear filter
+  const handleClear = () => {
+    onApply(column, '', '');
+    onClose();
+  };
+
   // Determine if the selected operator requires a value input
-  const requiresValue = !['IS NULL', 'IS NOT NULL'].includes(operator);
+  const requiresValue = (op: FilterOperator) => !['IS NULL', 'IS NOT NULL'].includes(op);
 
   // Get placeholder text based on operator
   const getPlaceholder = () => {
@@ -98,69 +107,101 @@ const FilterModal = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        <Typography variant="h6">
-          Filter: <span className="font-bold">{column}</span>
-        </Typography>
-      </DialogTitle>
-      <DialogContent>
-        <div className="space-y-4 py-2">
-          <FormControl fullWidth>
-            <InputLabel id="filter-operator-label">Operator</InputLabel>
-            <Select
-              labelId="filter-operator-label"
-              value={operator}
-              label="Operator"
-              onChange={(e) => setOperator(e.target.value as FilterOperator)}
+    <Dialog open={open} onOpenChange={() => onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center bg-blue-50 text-blue-800 -mx-6 -mt-4 px-6 py-3 border-b">
+            <div className="flex items-center">
+              <FiFilter className="mr-2" size={18} />
+              <span className="font-medium">
+                Filter Column: <span className="font-bold">{column}</span>
+              </span>
+            </div>
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="absolute right-4 top-4 text-gray-500 hover:text-gray-700 hover:bg-blue-100 rounded-full p-1"
             >
-              {FILTER_OPERATORS.map((op) => (
-                <MenuItem key={op} value={op}>
-                  {FILTER_OPERATOR_LABELS[op]}
-                </MenuItem>
-              ))}
+              <FiX />
+            </button>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="pt-4 pb-2 space-y-6">
+          <p className="text-sm text-gray-600 mb-4">
+            Select a filter condition for this column. Some operators require an additional value.
+          </p>
+          
+          <div className="mb-4">
+            <Label htmlFor="filter-operator">Operator</Label>
+            <Select 
+              value={operator} 
+              onValueChange={handleOperatorChange}
+            >
+              <SelectTrigger id="filter-operator" className="bg-white">
+                <SelectValue placeholder="Select operator" />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_OPERATORS.map((op) => (
+                  <SelectItem key={op} value={op}>
+                    {FILTER_OPERATOR_LABELS[op]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
-
-          {requiresValue && (
-            <TextField
-              autoFocus
-              label="Value"
-              fullWidth
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              error={!!error}
-              helperText={getHelperText()}
-              placeholder={getPlaceholder()}
-              variant="outlined"
-              margin="normal"
-            />
-          )}
-
-          {!requiresValue && (
-            <Typography variant="body2" className="text-gray-600 mt-2">
+          </div>
+          
+          {requiresValue(operator) ? (
+            <div>
+              <Label htmlFor="filter-value">Value</Label>
+              <Input
+                id="filter-value"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={getPlaceholder()}
+                className={`bg-white ${error ? 'border-red-500' : ''}`}
+                autoFocus
+              />
+              {getHelperText() && (
+                <p className={`text-sm mt-1 ${error ? 'text-red-500' : 'text-gray-500'}`}>
+                  {getHelperText()}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-500 text-sm">
               This operator doesn't require a value.
-            </Typography>
-          )}
-
-          {(operator === 'LIKE' || operator === 'NOT LIKE') && (
-            <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 mt-2">
-              <p className="font-medium mb-1">Examples:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li><code>%text%</code> - Contains "text"</li>
-                <li><code>text%</code> - Starts with "text"</li>
-                <li><code>%text</code> - Ends with "text"</li>
-              </ul>
             </div>
           )}
         </div>
+        
+        <DialogFooter className="px-0 py-3 flex justify-between bg-gray-50 -mx-6 -mb-4 px-6 border-t">
+          <Button 
+            onClick={handleClear} 
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+          >
+            Clear Filter
+          </Button>
+          
+          <div className="flex gap-2">
+            <Button 
+              onClick={onClose} 
+              variant="outline"
+              className="text-gray-600 hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApply} 
+              disabled={requiresValue(operator) && !value.trim()}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Apply
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleApply} variant="contained" color="primary">
-          Apply
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

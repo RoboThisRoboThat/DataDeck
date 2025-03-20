@@ -1,22 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Box,
-  Typography,
-  Divider,
-  IconButton
-} from '@mui/material';
 import { FiX, FiFilter } from 'react-icons/fi';
-import type { SelectChangeEvent } from '@mui/material';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface FilterCondition {
   operator: string;
@@ -70,8 +58,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   }, [open, currentFilter]);
   
   // Handle operator change
-  const handleOperatorChange = (event: SelectChangeEvent<string>) => {
-    const newOperator = event.target.value;
+  const handleOperatorChange = (newOperator: string) => {
     setOperator(newOperator);
     
     // Clear value if the operator doesn't require a value
@@ -107,109 +94,97 @@ const FilterModal: React.FC<FilterModalProps> = ({
   };
   
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="sm" 
-      fullWidth
-      className="rounded-lg"
-    >
-      <DialogTitle className="flex justify-between items-center bg-blue-50 text-blue-800 border-b px-4 py-3">
-        <div className="flex items-center">
-          <FiFilter className="mr-2" size={18} />
-          <Typography variant="h6" className="font-medium">
-            Filter Column: <span className="font-bold">{column}</span>
-          </Typography>
-        </div>
-        <IconButton 
-          edge="end" 
-          onClick={onClose} 
-          aria-label="close"
-          className="text-gray-500 hover:text-gray-700 hover:bg-blue-100"
-          size="small"
-        >
-          <FiX />
-        </IconButton>
-      </DialogTitle>
-      
-      <DialogContent className="pt-4 pb-2">
-        <Box className="space-y-6">
-          <Typography variant="body2" className="text-gray-600 mb-4">
-            Select a filter condition for this column. Some operators require an additional value.
-          </Typography>
-          
-          <FormControl fullWidth variant="outlined" className="mb-4">
-            <InputLabel id="filter-operator-label">Operator</InputLabel>
-            <Select
-              labelId="filter-operator-label"
-              value={operator}
-              label="Operator"
-              onChange={handleOperatorChange}
-              fullWidth
-              className="bg-white"
-              size="medium"
+    <Dialog open={open} onOpenChange={() => onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center bg-blue-50 text-blue-800 -mx-6 -mt-4 px-6 py-3 border-b">
+            <div className="flex items-center">
+              <FiFilter className="mr-2" size={18} />
+              <span className="font-medium">
+                Filter Column: <span className="font-bold">{column}</span>
+              </span>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="absolute right-4 top-4 text-gray-500 hover:text-gray-700 hover:bg-blue-100 rounded-full p-1"
             >
-              {FILTER_OPERATORS.map(op => (
-                <MenuItem key={op.value} value={op.value} className="py-2">
-                  {op.label}
-                </MenuItem>
-              ))}
+              <FiX />
+            </button>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="pt-4 pb-2 space-y-6">
+          <p className="text-sm text-gray-600 mb-4">
+            Select a filter condition for this column. Some operators require an additional value.
+          </p>
+          
+          <div className="mb-4">
+            <Label htmlFor="filter-operator">Operator</Label>
+            <Select 
+              value={operator} 
+              onValueChange={handleOperatorChange}
+            >
+              <SelectTrigger id="filter-operator" className="bg-white">
+                <SelectValue placeholder="Select operator" />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTER_OPERATORS.map(op => (
+                  <SelectItem key={op.value} value={op.value} className="py-2">
+                    {op.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
           
           {operator && FILTER_OPERATORS.find(op => op.value === operator)?.requiresValue && (
-            <TextField
-              label="Value"
-              value={value}
-              onChange={handleValueChange}
-              fullWidth
-              variant="outlined"
-              autoFocus
-              placeholder="Enter filter value"
-              className="bg-white"
-            />
+            <div>
+              <Label htmlFor="filter-value">Value</Label>
+              <Input
+                id="filter-value"
+                value={value}
+                onChange={handleValueChange}
+                placeholder="Enter filter value"
+                className="bg-white"
+                autoFocus
+              />
+            </div>
           )}
           
           {operator && !FILTER_OPERATORS.find(op => op.value === operator)?.requiresValue && (
-            <Box className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-500 text-sm">
+            <div className="p-3 bg-gray-50 rounded border border-gray-200 text-gray-500 text-sm">
               This operator doesn't require a value.
-            </Box>
+            </div>
           )}
-        </Box>
-      </DialogContent>
-      
-      <Divider />
-      
-      <DialogActions className="px-4 py-3 flex justify-between bg-gray-50">
-        <Button 
-          onClick={handleClear} 
-          color="error"
-          variant="outlined"
-          className="text-red-600 border-red-200 hover:bg-red-50"
-          size="medium"
-        >
-          Clear Filter
-        </Button>
-        
-        <div className="flex gap-2">
-          <Button 
-            onClick={onClose} 
-            color="inherit"
-            className="text-gray-600 hover:bg-gray-100"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleApply} 
-            color="primary" 
-            variant="contained" 
-            disabled={!isApplyEnabled()}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Apply
-          </Button>
         </div>
-      </DialogActions>
+        
+        <DialogFooter className="px-0 py-3 flex justify-between bg-gray-50 -mx-6 -mb-4 px-6 border-t">
+          <Button 
+            onClick={handleClear} 
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+          >
+            Clear Filter
+          </Button>
+          
+          <div className="flex gap-2">
+            <Button 
+              onClick={onClose} 
+              variant="outline"
+              className="text-gray-600 hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApply} 
+              disabled={!isApplyEnabled()}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Apply
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 };

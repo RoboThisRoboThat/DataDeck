@@ -1,21 +1,17 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { 
-  Box, 
-  Paper, 
-  Typography, 
-  useTheme, 
-  IconButton, 
-  LinearProgress,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Tooltip,
-  Badge,
-  TablePagination
-} from '@mui/material';
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FiFilter, FiArrowUp, FiArrowDown, FiDownload, FiSearch } from 'react-icons/fi';
 import FilterModal from './FilterModal';
+import { Badge } from 'lucide-react';
 
 interface QueryResultsProps {
   data: any[];
@@ -36,7 +32,6 @@ interface FilterCondition {
 }
 
 const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) => {
-  const theme = useTheme();
   const tableRef = useRef<HTMLDivElement>(null);
   
   // Debug logs to check incoming data
@@ -229,15 +224,13 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
   }, [filteredAndSortedData, page, rowsPerPage]);
   
   // Update the page change handler to be more explicit
-  const handlePageChange = (event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+  const handlePageChange = (newPage: number) => {
     console.log('Changing to page:', newPage); // Debug log
     setPage(newPage);
   };
   
   // Update the rows per page change handler
-  const handleRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newRowsPerPage = Number.parseInt(event.target.value, 10);
-    console.log('Changing rows per page to:', newRowsPerPage); // Debug log
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
     setRowsPerPage(newRowsPerPage);
     setPage(0); // Reset to first page when changing rows per page
   };
@@ -291,127 +284,6 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
     return String(value);
   };
   
-  // Get cell width based on column name and content
-  const getCellWidth = (column: string): string => {
-    // Adjust width based on column name length
-    if (column.length > 30) return '300px';
-    if (column.length > 20) return '250px';
-    if (column.length > 10) return '200px';
-    return '150px';
-  };
-  
-  // Render table header
-  const renderTableHeader = () => (
-    <div className="flex min-w-max border-b border-gray-200">
-      {effectiveColumns.map(column => {
-        const isColumnSorted = sortConfig.column === column;
-        const isColumnFiltered = column in filters;
-        
-        return (
-          <div
-            key={column}
-            className={`
-              flex-none w-[200px] p-3
-              flex items-center justify-between
-              font-medium text-gray-700 text-sm
-              hover:bg-gray-50 cursor-pointer
-              ${isColumnSorted ? 'bg-blue-50' : ''}
-              ${isColumnFiltered ? 'bg-yellow-50' : ''}
-            `}
-            onClick={() => handleSortChange(column, isColumnSorted ? (sortConfig.direction === 'asc' ? 'desc' : null) : 'asc')}
-            role="columnheader"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleSortChange(column, isColumnSorted ? (sortConfig.direction === 'asc' ? 'desc' : null) : 'asc');
-              }
-            }}
-          >
-            <div className="flex items-center space-x-2">
-              <span className="truncate">{column}</span>
-              {isColumnSorted && (
-                <span className="text-blue-500">
-                  {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                </span>
-              )}
-            </div>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFilterClick(column);
-              }}
-              className={`
-                p-1 hover:bg-gray-200 rounded
-                ${isColumnFiltered ? 'text-yellow-600' : 'text-gray-400'}
-              `}
-            >
-              <FiFilter size={14} />
-            </IconButton>
-          </div>
-        );
-      })}
-    </div>
-  );
-  
-  // Render a table row
-  const renderTableRow = (row: Record<string, unknown>, index: number) => (
-    <div
-      key={index}
-      className={`
-        flex min-w-max border-b border-gray-100
-        ${hoveredRow === index ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-      `}
-      onMouseEnter={() => setHoveredRow(index)}
-      onMouseLeave={() => setHoveredRow(null)}
-    >
-      {effectiveColumns.map(column => {
-        const value = formatCellValue(row[column]);
-        const isEmpty = value === '';
-        
-        return (
-          <div
-            key={column}
-            className={`
-              flex-none w-[200px] p-3
-              text-sm truncate
-              ${isEmpty ? 'text-gray-400 italic' : 'text-gray-700'}
-            `}
-            title={isEmpty ? 'NULL' : value}
-          >
-            {isEmpty ? 'NULL' : value}
-          </div>
-        );
-      })}
-    </div>
-  );
-  
-  // Render empty state
-  const renderEmptyState = () => (
-    <Box className="flex flex-col items-center justify-center p-8 h-[300px] w-full text-center">
-      <FiSearch size={40} className="text-gray-300 mb-4" />
-      <Typography variant="h6" className="text-gray-500 mb-2">
-        No data found
-      </Typography>
-      <Typography variant="body2" className="text-gray-400 max-w-md">
-        {Object.keys(filters).length > 0 
-          ? 'Try adjusting your filters to see more results'
-          : 'Run a query to see results here'}
-      </Typography>
-    </Box>
-  );
-  
-  // Render loading state
-  const renderLoadingState = () => (
-    <Box className="flex flex-col items-center justify-center p-8 h-[300px] w-full">
-      <Typography variant="h6" className="text-gray-500 mb-4">
-        Executing query...
-      </Typography>
-      <LinearProgress className="w-48" />
-    </Box>
-  );
-  
   // Render table header with active filters and sort
   const renderTableHeaderControls = () => {
     // Format filter display value
@@ -442,9 +314,10 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
 
     const renderActiveFiltersAndSort = () => {
       const activeFilters = Object.entries(filters).map(([column, filter]) => (
-        <div
+        <Badge
           key={`filter-${column}`}
-          className="flex items-center bg-blue-50 text-blue-700 text-sm rounded-full px-3 py-1 mr-2 mb-2 border border-blue-100"
+          variant="secondary"
+          className="bg-blue-50 text-blue-700 border border-blue-100 mr-2 mb-2 px-3 py-1 flex items-center gap-1"
         >
           <span className="font-medium mr-1">{column}</span>
           <span className="mr-2">{formatFilterDisplay(filter.operator, filter.value)}</span>
@@ -458,13 +331,14 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </Badge>
       ));
 
       const sortChip = sortConfig.column && sortConfig.direction && (
-        <div
+        <Badge
           key="sort-chip"
-          className="flex items-center bg-purple-50 text-purple-700 text-sm rounded-full px-3 py-1 mr-2 mb-2 border border-purple-100"
+          variant="secondary"
+          className="bg-purple-50 text-purple-700 border border-purple-100 mr-2 mb-2 px-3 py-1 flex items-center gap-1"
         >
           <span className="font-medium mr-1">{sortConfig.column}</span>
           <span className="mr-2 flex items-center">
@@ -485,7 +359,7 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </Badge>
       );
 
       return [...activeFilters, sortChip];
@@ -496,7 +370,7 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
     return (
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-2">
-          <Typography variant="h6" className="text-gray-800 font-medium">
+          <h3 className="text-gray-800 text-lg font-medium">
             Results{' '}
             <span className="text-sm font-normal text-gray-500 ml-2">
               {filteredAndSortedData.length} rows total
@@ -507,18 +381,26 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
                 </span>
               )}
             </span>
-          </Typography>
+          </h3>
           
-          <Tooltip title="Export as CSV">
-            <IconButton 
-              size="small" 
-              onClick={exportToCSV}
-              disabled={!filteredAndSortedData.length}
-              className={!filteredAndSortedData.length ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'}
-            >
-              <FiDownload size={18} />
-            </IconButton>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  onClick={exportToCSV}
+                  disabled={!filteredAndSortedData.length}
+                  className={!filteredAndSortedData.length ? "text-gray-300" : "text-gray-600 hover:bg-gray-100"}
+                >
+                  <FiDownload size={18} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Export as CSV</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         
         {/* Active Filters and Sort Chips */}
@@ -531,79 +413,200 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
     );
   };
 
+  // Render empty state
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center p-8 h-[300px] w-full text-center">
+      <FiSearch size={40} className="text-gray-300 mb-4" />
+      <h3 className="text-gray-500 mb-2 text-lg font-medium">
+        No data found
+      </h3>
+      <p className="text-gray-400 max-w-md text-sm">
+        {Object.keys(filters).length > 0 
+          ? 'Try adjusting your filters to see more results'
+          : 'Run a query to see results here'}
+      </p>
+    </div>
+  );
+  
+  // Render loading state
+  const renderLoadingState = () => (
+    <div className="flex flex-col items-center justify-center p-8 h-[300px] w-full">
+      <h3 className="text-gray-500 mb-4 text-lg font-medium">
+        Executing query...
+      </h3>
+      <div className="w-48 h-1 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-full bg-blue-500 animate-progress"></div>
+      </div>
+    </div>
+  );
+
   const hasData = filteredAndSortedData.length > 0;
   
   return (
-    <Box className="h-full flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Table header with filters - Fixed */}
-      <Box className="flex-none border-b border-gray-200">
+      <div className="flex-none border-b border-gray-200">
         {effectiveColumns.length > 0 && renderTableHeaderControls()}
-      </Box>
+      </div>
 
       {/* Table container with horizontal scroll wrapper */}
-      <Box className="flex-1 overflow-hidden flex flex-col relative">
-        {/* Horizontal scroll container */}
-        <Box className="overflow-x-auto">
-          <Box className="min-w-full inline-block">
-            {/* Fixed header */}
-            <Box className="sticky top-0 z-10 bg-white shadow-sm">
-              {effectiveColumns.length > 0 && renderTableHeader()}
-            </Box>
-
-            {/* Scrollable body */}
-            <Box className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)' }}>
-              {loading && !filteredAndSortedData.length ? (
-                renderLoadingState()
-              ) : filteredAndSortedData.length > 0 ? (
-                <div>
-                  {paginatedData.map((row, index) => renderTableRow(row, index))}
-                </div>
-              ) : (
-                renderEmptyState()
-              )}
-            </Box>
-          </Box>
-        </Box>
+      <div className="flex-1 overflow-hidden flex flex-col relative">
+        {loading && !filteredAndSortedData.length ? (
+          renderLoadingState()
+        ) : filteredAndSortedData.length > 0 ? (
+          <div className="flex-1 overflow-auto">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-white sticky top-0 z-10">
+                    <TableRow className="hover:bg-white">
+                      {effectiveColumns.map(column => {
+                        const isColumnSorted = sortConfig.column === column;
+                        const isColumnFiltered = column in filters;
+                        
+                        return (
+                          <TableHead 
+                            key={column}
+                            className={`px-3 py-3 font-medium text-sm truncate border-b border-gray-200
+                              ${isColumnSorted ? 'bg-blue-50' : ''}
+                              ${isColumnFiltered ? 'bg-yellow-50' : ''}
+                            `}
+                          >
+                            <div className="flex items-center justify-between">
+                              <button
+                                className="text-gray-700 font-medium truncate flex items-center"
+                                onClick={() => handleSortChange(column, isColumnSorted ? (sortConfig.direction === 'asc' ? 'desc' : null) : 'asc')}
+                              >
+                                <span className="truncate">{column}</span>
+                                {isColumnSorted && (
+                                  <span className="ml-1 text-blue-500">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </button>
+                              <button
+                                className={`p-1 rounded hover:bg-gray-200 ${isColumnFiltered ? 'text-yellow-600' : 'text-gray-400'}`}
+                                onClick={(e) => handleFilterClick(column)}
+                              >
+                                <FiFilter size={14} />
+                              </button>
+                            </div>
+                          </TableHead>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.map((row, index) => (
+                      <TableRow 
+                        key={index}
+                        className={`${hoveredRow === index ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        onMouseEnter={() => setHoveredRow(index)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                      >
+                        {effectiveColumns.map(column => {
+                          const value = formatCellValue(row[column]);
+                          const isEmpty = value === '';
+                          
+                          return (
+                            <TableCell
+                              key={`${index}-${column}`}
+                              className={`px-3 py-3 text-sm truncate
+                                ${isEmpty ? 'text-gray-400 italic' : 'text-gray-700'}
+                              `}
+                              title={isEmpty ? 'NULL' : value}
+                            >
+                              {isEmpty ? 'NULL' : value}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          renderEmptyState()
+        )}
         
         {/* Pagination - Fixed at bottom */}
         {filteredAndSortedData.length > 0 && (
-          <Box className="flex-none border-t border-gray-200 bg-white mt-auto">
-            <TablePagination
-              component="div"
-              count={filteredAndSortedData.length}
-              page={page}
-              onPageChange={handlePageChange}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleRowsPerPageChange}
-              rowsPerPageOptions={[50, 100, 250, 500]}
-              showFirstButton
-              showLastButton
-              className="border-t border-gray-200"
-              sx={{
-                '.MuiTablePagination-select': {
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                },
-                '.MuiTablePagination-selectLabel': {
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                },
-                '.MuiTablePagination-displayedRows': {
-                  paddingTop: '0.5rem',
-                  paddingBottom: '0.5rem',
-                },
-                '.MuiTablePagination-actions': {
-                  marginLeft: '1rem',
-                  gap: '0.5rem',
-                },
-                '.MuiTablePagination-root': {
-                  overflow: 'visible',
-                }
-              }}
-            />
-          </Box>
+          <div className="flex-none border-t border-gray-200 bg-white">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <span>Rows per page:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
+                  className="border rounded text-sm py-1 px-2"
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                  <option value={500}>500</option>
+                </select>
+                <span className="ml-4">
+                  {page * rowsPerPage + 1}-{Math.min((page + 1) * rowsPerPage, filteredAndSortedData.length)}{' '}
+                  of {filteredAndSortedData.length}
+                </span>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(0)}
+                  disabled={page === 0}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">First page</span>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8.84182 3.13514C9.04327 3.32401 9.05348 3.64042 8.86462 3.84188L5.43521 7.49991L8.86462 11.1579C9.05348 11.3594 9.04327 11.6758 8.84182 11.8647C8.64036 12.0535 8.32394 12.0433 8.13508 11.8419L4.38508 7.84188C4.20477 7.64955 4.20477 7.35027 4.38508 7.15794L8.13508 3.15794C8.32394 2.95648 8.64036 2.94628 8.84182 3.13514Z" fill="currentColor" />
+                  </svg>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 0}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">Previous page</span>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6.85355 3.14645C7.04882 3.34171 7.04882 3.65829 6.85355 3.85355L3.70711 7H12.5C12.7761 7 13 7.22386 13 7.5C13 7.77614 12.7761 8 12.5 8H3.70711L6.85355 11.1464C7.04882 11.3417 7.04882 11.6583 6.85355 11.8536C6.65829 12.0488 6.34171 12.0488 6.14645 11.8536L2.14645 7.85355C1.95118 7.65829 1.95118 7.34171 2.14645 7.14645L6.14645 3.14645C6.34171 2.95118 6.65829 2.95118 6.85355 3.14645Z" fill="currentColor" />
+                  </svg>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= Math.ceil(filteredAndSortedData.length / rowsPerPage) - 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">Next page</span>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8.14645 3.14645C8.34171 2.95118 8.65829 2.95118 8.85355 3.14645L12.8536 7.14645C13.0488 7.34171 13.0488 7.65829 12.8536 7.85355L8.85355 11.8536C8.65829 12.0488 8.34171 12.0488 8.14645 11.8536C7.95118 11.6583 7.95118 11.3417 8.14645 11.1464L11.2929 8H2.5C2.22386 8 2 7.77614 2 7.5C2 7.22386 2.22386 7 2.5 7H11.2929L8.14645 3.85355C7.95118 3.65829 7.95118 3.34171 8.14645 3.14645Z" fill="currentColor" />
+                  </svg>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(Math.ceil(filteredAndSortedData.length / rowsPerPage) - 1)}
+                  disabled={page >= Math.ceil(filteredAndSortedData.length / rowsPerPage) - 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">Last page</span>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6.1584 3.13508C5.95694 3.32394 5.94673 3.64036 6.1356 3.84182L9.56499 7.49989L6.1356 11.1579C5.94673 11.3594 5.95694 11.6758 6.1584 11.8647C6.35986 12.0535 6.67627 12.0433 6.86514 11.8419L10.6151 7.84182C10.7954 7.64949 10.7954 7.35029 10.6151 7.15796L6.86514 3.15796C6.67627 2.9565 6.35986 2.94629 6.1584 3.13508Z" fill="currentColor" />
+                  </svg>
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Filter Modal */}
       <FilterModal 
@@ -613,7 +616,7 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data, columns, loading }) =
         currentFilter={filters[filterColumn]}
         onApply={handleFilterApply}
       />
-    </Box>
+    </div>
   );
 };
 

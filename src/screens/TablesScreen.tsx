@@ -1,7 +1,9 @@
 import { useScreen } from '../context/ScreenContext';
 import SQLTables from '../features/SQLTables';
-import { IoCheckboxOutline } from 'react-icons/io5';
 import { useState, useEffect } from 'react';
+import { Database, X } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Layout } from '../components/Layout';
 
 export function TablesScreen() {
   const { setCurrentScreen, activeConnectionId, activeConnectionName, setActiveConnectionId, setActiveConnectionName } = useScreen();
@@ -83,55 +85,58 @@ export function TablesScreen() {
 
   if (loadingConnection) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center">
-        <p>Connecting to database...</p>
+      <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          <p className="text-sm text-muted-foreground">Connecting to database...</p>
+        </div>
       </div>
     );
   }
 
+  const headerActions = (
+    <Button 
+      variant="ghost"
+      size="sm"
+      onClick={handleDisconnect}
+      className="text-sm"
+    >
+      <X className="size-4 mr-1.5" />
+      Disconnect
+    </Button>
+  );
+
   return (
-    <div className="h-screen w-screen flex flex-col">
-      {/* Header with connection name and disconnect button */}
-      <div className="bg-gray-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+    <Layout 
+      showThemeToggle={false}
+      title={
         <div className="flex items-center gap-2">
-          <button 
-            type="button"
-            onClick={handleDisconnect}
-            className="p-1 rounded-full hover:bg-gray-200 text-gray-600"
-            title="Disconnect and return to connections"
-          >
-            <IoCheckboxOutline className="w-5 h-5" />
-          </button>
+          <Database className="size-4 text-primary" />
           <span className="font-medium">{activeConnectionName || 'Database'}</span>
-          <span className="text-xs text-gray-500">({activeConnectionId})</span>
+          {activeConnectionId && (
+            <span className="text-xs text-muted-foreground">({activeConnectionId})</span>
+          )}
         </div>
-        <button 
-          type="button"
-          onClick={handleDisconnect}
-          className="text-sm text-gray-600 hover:text-gray-800"
-        >
-          Disconnect
-        </button>
-      </div>
-      
-      <div>
+      }
+      actions={headerActions}
+    >
+      <div className="flex-1">
         {activeConnectionId ? (
           <SQLTables 
             connectionId={activeConnectionId} 
             onDisconnect={handleDisconnect} 
           />
         ) : (
-          <div className="flex items-center justify-center w-full">
-            <button
-              type="button"
+          <div className="h-full flex items-center justify-center">
+            <Button
+              variant="default"
               onClick={() => setCurrentScreen('connection')}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
               Return to Connections
-            </button>
+            </Button>
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 } 
