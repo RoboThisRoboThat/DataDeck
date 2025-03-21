@@ -1,17 +1,7 @@
 import React from 'react';
-import {
-  Box,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  IconButton,
-  Typography,
-  Divider,
-  Skeleton,
-  Tooltip,
-  Paper
-} from '@mui/material';
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FiDatabase, FiTrash2, FiSearch, FiAlertCircle, FiClock, FiEdit } from 'react-icons/fi';
 
 interface SavedQuery {
@@ -43,24 +33,6 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
 }) => {
   // State for search
   const [searchTerm, setSearchTerm] = React.useState<string>('');
-  
-  // Handle query selection
-  const handleSelectQuery = (sql: string, name: string) => {
-    onSelectQuery(sql, name);
-  };
-  
-  // Handle query deletion
-  const handleDeleteQuery = async (name: string, event: React.MouseEvent) => {
-    // Stop propagation to prevent selecting the query when deleting
-    event.stopPropagation();
-    
-    // Confirm before deleting
-    if (window.confirm(`Are you sure you want to delete the query "${name}"?`)) {
-      await onDeleteQuery(name);
-      // Refresh the queries list after deletion using the provided method
-      onRefetchQueries();
-    }
-  };
   
   // Handle search
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,11 +74,24 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
     });
   };
   
+  // Handle query deletion
+  const handleDeleteQuery = async (name: string, event: React.MouseEvent) => {
+    // Stop propagation to prevent selecting the query when deleting
+    event.stopPropagation();
+    
+    // Confirm before deleting
+    if (window.confirm(`Are you sure you want to delete the query "${name}"?`)) {
+      await onDeleteQuery(name);
+      // Refresh the queries list after deletion using the provided method
+      onRefetchQueries();
+    }
+  };
+  
   // Render loading state
   if (loading) {
     return (
-      <Box className="p-4">
-        <Typography variant="h6" className="text-gray-800 mb-3 font-medium">Saved Queries</Typography>
+      <div className="p-4">
+        <h6 className="text-gray-800 mb-3 font-medium">Saved Queries</h6>
         <div className="relative mt-2 mb-4">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <FiSearch className="h-5 w-5 text-gray-400" />
@@ -118,59 +103,59 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
             disabled
           />
         </div>
-        <Divider className="mb-3" />
+        <div className="mb-3 border-b" />
         
         {[1, 2, 3].map(i => (
-          <Box key={i} className="mb-4 bg-white rounded p-3 border border-gray-200">
-            <Skeleton variant="text" width="70%" height={28} />
-            <Skeleton variant="text" width="40%" height={16} className="mt-2" />
-          </Box>
+          <div key={i} className="mb-4 bg-white rounded p-3 border border-gray-200">
+            <Skeleton className="w-70 h-28" />
+            <Skeleton className="w-40 h-16 mt-2" />
+          </div>
         ))}
-      </Box>
+      </div>
     );
   }
   
   // Render error state
   if (error) {
     return (
-      <Box className="p-4">
-        <Typography variant="h6" className="text-gray-800 mb-3 font-medium">Saved Queries</Typography>
-        <Divider className="mb-4" />
+      <div className="p-4">
+        <h6 className="text-gray-800 mb-3 font-medium">Saved Queries</h6>
+        <div className="mb-4 border-b" />
         
-        <Paper className="p-4 bg-red-50 text-red-700 flex items-start rounded border border-red-200">
+        <div className="p-4 bg-red-50 text-red-700 flex items-start rounded border border-red-200">
           <FiAlertCircle className="mr-2 mt-0.5 flex-shrink-0" />
-          <Typography variant="body2">
+          <p className="text-sm">
             {error}
-          </Typography>
-        </Paper>
-      </Box>
+          </p>
+        </div>
+      </div>
     );
   }
   
   // Render empty state
   if (queries.length === 0) {
     return (
-      <Box className="p-4">
-        <Typography variant="h6" className="text-gray-800 mb-3 font-medium">Saved Queries</Typography>
-        <Divider className="mb-6" />
+      <div className="p-4">
+        <h6 className="text-gray-800 mb-3 font-medium">Saved Queries</h6>
+        <div className="mb-6 border-b" />
         
-        <Box className="flex flex-col items-center justify-center py-8 text-center">
+        <div className="flex flex-col items-center justify-center py-8 text-center">
           <FiDatabase size={36} className="text-gray-300 mb-3" />
-          <Typography variant="body1" className="text-gray-600 mb-1 font-medium">
+          <p className="text-gray-600 mb-1 font-medium">
             No saved queries found
-          </Typography>
-          <Typography variant="body2" className="text-gray-500 max-w-xs">
+          </p>
+          <p className="text-gray-500 max-w-xs">
             Save a query using the save button to see it here.
-          </Typography>
-        </Box>
-      </Box>
+          </p>
+        </div>
+      </div>
     );
   }
   
   // Render queries list
   return (
-    <Box className="p-4">
-      <Typography variant="h6" className="text-gray-800 mb-3 font-medium">Saved Queries</Typography>
+    <div className="p-4">
+      <h6 className="text-gray-800 mb-3 font-medium">Saved Queries</h6>
       
       {/* Search input */}
       <div className="relative mt-2 mb-4">
@@ -186,81 +171,85 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
         />
       </div>
       
-      <Divider className="mb-3" />
+      <div className="mb-3 border-b" />
       
       {filteredQueries.length === 0 && (
-        <Typography variant="body2" className="text-gray-500 py-4 text-center">
+        <p className="text-gray-500 py-4 text-center">
           No queries match your search.
-        </Typography>
+        </p>
       )}
       
-      <List className="space-y-2" disablePadding>
+      <div className="space-y-3">
         {filteredQueries.map((query) => {
           const isActive = currentQueryName === query.name;
           
           return (
-            <Paper
+            <button
               key={query.name}
-              elevation={0}
-              className={`overflow-hidden border rounded transition-colors duration-150 ${
+              type="button"
+              onClick={() => onSelectQuery(query.sql, query.name)}
+              aria-pressed={isActive}
+              className={`w-full text-left overflow-hidden rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow ${
                 isActive 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-l-4 border-blue-500 bg-blue-50' 
+                  : 'border border-gray-200 hover:border-blue-300'
               }`}
             >
-              <ListItem 
-                disablePadding
-                secondaryAction={
-                  <Tooltip title="Delete query">
-                    <IconButton 
-                      edge="end" 
-                      aria-label="delete" 
-                      onClick={(e) => handleDeleteQuery(query.name, e)}
-                      size="small"
-                      className="text-gray-400 hover:text-red-500 hover:bg-red-50 mr-1"
-                    >
-                      <FiTrash2 size={16} />
-                    </IconButton>
-                  </Tooltip>
-                }
-              >
-                <ListItemButton 
-                  onClick={() => handleSelectQuery(query.sql, query.name)}
-                  className={`py-3 px-4 ${isActive ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
-                >
-                  <div className="flex flex-col w-full pr-8">
-                    <div className="flex items-center mb-1">
-                      <ListItemIcon className="min-w-[28px]">
-                        {isActive ? (
-                          <FiEdit size={16} className="text-blue-600" />
-                        ) : (
-                          <FiDatabase size={16} className="text-blue-500" />
-                        )}
-                      </ListItemIcon>
-                      <Typography 
-                        className={`font-medium ${isActive ? 'text-blue-700' : 'text-gray-800'}`}
-                        noWrap
-                      >
-                        {query.name}
-                      </Typography>
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className={`flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-blue-500'}`}>
+                      {isActive ? (
+                        <FiEdit size={18} />
+                      ) : (
+                        <FiDatabase size={18} />
+                      )}
                     </div>
-                    
-                    {query.createdAt && (
-                      <div className="flex items-center pl-9 text-gray-400">
-                        <FiClock size={12} className="mr-1.5" />
-                        <Typography variant="caption">
-                          {formatDate(query.createdAt)}
-                        </Typography>
-                      </div>
-                    )}
+                    <p 
+                      className={`font-medium text-base truncate max-w-[180px] ${isActive ? 'text-blue-700' : 'text-gray-800'}`}
+                    >
+                      {query.name}
+                    </p>
                   </div>
-                </ListItemButton>
-              </ListItem>
-            </Paper>
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          type="button"
+                          onClick={(e) => handleDeleteQuery(query.name, e)}
+                          className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                        >
+                          <FiTrash2 size={16} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete query</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                
+                {query.description && (
+                  <p className="text-sm text-gray-500 mb-2 line-clamp-2">
+                    {query.description}
+                  </p>
+                )}
+                
+                {query.createdAt && (
+                  <div className="flex items-center text-gray-400 mt-2">
+                    <FiClock size={14} className="mr-1.5" />
+                    <p className="text-xs">
+                      {formatDate(query.createdAt)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </button>
           );
         })}
-      </List>
-    </Box>
+      </div>
+    </div>
   );
 };
 

@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Typography,
-  Box
-} from '@mui/material';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface SaveQueryModalProps {
   open: boolean;
@@ -28,7 +31,7 @@ const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
   const [nameError, setNameError] = useState('');
 
   // Reset form when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setName('');
       setDescription('');
@@ -46,7 +49,7 @@ const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
   };
 
   // Handle description change
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDescription(e.target.value);
   };
 
@@ -60,89 +63,63 @@ const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      className="rounded-lg"
-    >
-      <DialogTitle className="bg-blue-50 text-blue-800 border-b">
-        Save SQL Query
-      </DialogTitle>
-      
-      <DialogContent className="pt-4 mt-2">
-        <Box className="space-y-4">
-          <Typography variant="body2" className="text-gray-600 mb-2">
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-blue-800">Save SQL Query</DialogTitle>
+          <DialogDescription className="text-gray-600">
             Save your query to easily access it later. Provide a descriptive name to help you identify it.
-          </Typography>
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Query Name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={handleNameChange}
+              placeholder="e.g., Monthly Sales Report"
+              autoFocus
+              required
+            />
+            {nameError && (
+              <p className="text-sm text-red-500">{nameError}</p>
+            )}
+          </div>
           
-          <TextField
-            label="Query Name"
-            value={name}
-            onChange={handleNameChange}
-            fullWidth
-            variant="outlined"
-            autoFocus
-            required
-            error={!!nameError}
-            helperText={nameError}
-            className="mb-4"
-            placeholder="e.g., Monthly Sales Report"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={handleDescriptionChange}
+              placeholder="What does this query do?"
+              rows={2}
+            />
+          </div>
           
-          <TextField
-            label="Description (Optional)"
-            value={description}
-            onChange={handleDescriptionChange}
-            fullWidth
-            variant="outlined"
-            multiline
-            rows={2}
-            placeholder="What does this query do?"
-            className="mb-2"
-          />
-          
-          <Box className="bg-gray-50 p-3 rounded mt-4 border border-gray-200">
-            <Typography variant="caption" className="text-gray-500 font-medium">
-              QUERY PREVIEW
-            </Typography>
-            <Typography 
-              variant="body2" 
-              className="font-mono text-gray-800 whitespace-pre-wrap"
-              sx={{
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxHeight: '60px'
-              }}
-            >
+          <div className="bg-gray-50 p-3 rounded mt-4 border border-gray-200">
+            <p className="text-xs text-gray-500 font-medium">QUERY PREVIEW</p>
+            <pre className="text-sm text-gray-800 font-mono whitespace-pre-wrap overflow-hidden text-ellipsis max-h-[60px]">
               {sql}
-            </Typography>
-          </Box>
-        </Box>
+            </pre>
+          </div>
+        </div>
+        
+        <DialogFooter className="border-t bg-gray-50 py-3">
+          <Button variant="outline" onClick={onClose} className="text-gray-600">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={!name.trim()}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Save Query
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      
-      <DialogActions className="p-3 border-t bg-gray-50">
-        <Button 
-          onClick={onClose} 
-          color="inherit"
-          className="text-gray-600 hover:bg-gray-100"
-        >
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSave} 
-          variant="contained" 
-          color="primary"
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-          disabled={!name.trim()}
-        >
-          Save Query
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

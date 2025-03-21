@@ -1,19 +1,17 @@
 import { useState } from 'react';
-import { Modal, Box, TextField, Button, Typography, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
 import type { Connection } from '../types/connection';
-
-const style = {
-  position: 'absolute' as const,
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  boxShadow: 24,
-  p: 4,
-  borderRadius: 2,
-};
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface Props {
   open: boolean;
@@ -40,13 +38,11 @@ export function AddConnectionModal({ open, onClose, onAdd }: Props) {
     }));
   };
 
-  const handleSelectChange = (e: SelectChangeEvent) => {
-    const { name, value } = e.target;
+  const handleDbTypeChange = (value: 'mysql' | 'postgres') => {
     setFormData(prev => ({
       ...prev,
-      [name]: value,
-      // Update default port when database type changes
-      ...(name === 'dbType' && { port: value === 'mysql' ? '3306' : '5432' })
+      dbType: value,
+      port: value === 'mysql' ? '3306' : '5432'
     }));
   };
 
@@ -61,90 +57,105 @@ export function AddConnectionModal({ open, onClose, onAdd }: Props) {
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <Box sx={style}>
-        <Typography variant="h6" component="h2" mb={2}>
-          Add New Connection
-        </Typography>
-        <form onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Connection Name"
-            name="name"
-            value={formData.name}
-            onChange={handleTextChange}
-            required
-          />
-          <FormControl fullWidth margin="normal" required>
-            <InputLabel id="db-type-label">Database Type</InputLabel>
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add New Connection</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="name">Connection Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="dbType">Database Type</Label>
             <Select
-              labelId="db-type-label"
-              name="dbType"
               value={formData.dbType}
-              label="Database Type"
-              onChange={handleSelectChange}
+              onValueChange={handleDbTypeChange}
             >
-              <MenuItem value="mysql">MySQL</MenuItem>
-              <MenuItem value="postgres">PostgreSQL</MenuItem>
+              <SelectTrigger id="dbType">
+                <SelectValue placeholder="Select database type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mysql">MySQL</SelectItem>
+                <SelectItem value="postgres">PostgreSQL</SelectItem>
+              </SelectContent>
             </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Host"
-            name="host"
-            value={formData.host}
-            onChange={handleTextChange}
-            required
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Port"
-            name="port"
-            value={formData.port}
-            onChange={handleTextChange}
-            required
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Username"
-            name="user"
-            value={formData.user}
-            onChange={handleTextChange}
-            required
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleTextChange}
-            required
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Database"
-            name="database"
-            value={formData.database}
-            onChange={handleTextChange}
-            required
-          />
-          <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-            <Button variant="outlined" onClick={onClose}>
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="host">Host</Label>
+            <Input
+              id="host"
+              name="host"
+              value={formData.host}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="port">Port</Label>
+            <Input
+              id="port"
+              name="port"
+              value={formData.port}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="user">Username</Label>
+            <Input
+              id="user"
+              name="user"
+              value={formData.user}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="database">Database</Label>
+            <Input
+              id="database"
+              name="database"
+              value={formData.database}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          
+          <DialogFooter className="mt-4 sm:justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="contained" type="submit">
+            <Button type="submit">
               Add Connection
             </Button>
-          </Box>
+          </DialogFooter>
         </form>
-      </Box>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 } 

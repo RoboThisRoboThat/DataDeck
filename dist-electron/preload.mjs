@@ -74,6 +74,10 @@ electron.contextBridge.exposeInMainWorld("database", {
   },
   getActiveConnections: () => {
     return electron.ipcRenderer.invoke("db:getActiveConnections");
+  },
+  getDatabaseSchema: (id) => {
+    console.log("[Preload] getDatabaseSchema with ID:", id);
+    return electron.ipcRenderer.invoke("db:getDatabaseSchema", id);
   }
 });
 electron.contextBridge.exposeInMainWorld("windowManager", {

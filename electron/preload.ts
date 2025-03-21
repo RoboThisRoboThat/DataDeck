@@ -95,7 +95,11 @@ contextBridge.exposeInMainWorld('database', {
   },
   getActiveConnections: () => {
     return ipcRenderer.invoke('db:getActiveConnections');
-  }
+  },
+  getDatabaseSchema: (id: string) => {
+    console.log("[Preload] getDatabaseSchema with ID:", id);
+    return ipcRenderer.invoke('db:getDatabaseSchema', id);
+  },
 })
 
 // Add a new context bridge for window management
@@ -162,6 +166,7 @@ declare global {
       ) => Promise<boolean>
       isConnected: (id: string) => Promise<boolean>
       getActiveConnections: () => Promise<string[]>
+      getDatabaseSchema: (id: string) => Promise<any>
     }
     store: {
       getConnections: () => Promise<Connection[]>

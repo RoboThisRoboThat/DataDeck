@@ -40759,6 +40759,67 @@ class MySQLService {
       return false;
     }
   }
+  async getDatabaseSchema() {
+    if (!this.connection) {
+      throw new Error("No MySQL connection");
+    }
+    try {
+      const [tables] = await this.connection.execute(`
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE()
+            `);
+      const result = [];
+      for (const table of tables) {
+        const tableName = table.TABLE_NAME;
+        const [columns] = await this.connection.execute(`
+                    SELECT 
+                        COLUMN_NAME, 
+                        DATA_TYPE,
+                        IS_NULLABLE,
+                        COLUMN_KEY,
+                        COLUMN_DEFAULT,
+                        CHARACTER_MAXIMUM_LENGTH,
+                        NUMERIC_PRECISION
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                `, [tableName]);
+        const [foreignKeys] = await this.connection.execute(`
+                    SELECT
+                        COLUMN_NAME,
+                        REFERENCED_TABLE_NAME,
+                        REFERENCED_COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                    AND REFERENCED_TABLE_NAME IS NOT NULL
+                `, [tableName]);
+        const tableInfo = {
+          name: tableName,
+          columns: columns.map((col) => ({
+            name: col.COLUMN_NAME,
+            type: col.DATA_TYPE,
+            length: col.CHARACTER_MAXIMUM_LENGTH,
+            precision: col.NUMERIC_PRECISION,
+            isPrimary: col.COLUMN_KEY === "PRI",
+            isNullable: col.IS_NULLABLE === "YES",
+            defaultValue: col.COLUMN_DEFAULT
+          })),
+          foreignKeys: foreignKeys.map((fk) => ({
+            column: fk.COLUMN_NAME,
+            referencedTable: fk.REFERENCED_TABLE_NAME,
+            referencedColumn: fk.REFERENCED_COLUMN_NAME
+          }))
+        };
+        result.push(tableInfo);
+      }
+      return result;
+    } catch (error2) {
+      console.error("Error extracting MySQL database schema:", error2);
+      throw error2;
+    }
+  }
 }
 const originCache = /* @__PURE__ */ new Map(), originStackCache = /* @__PURE__ */ new Map(), originError = Symbol("OriginError");
 const CLOSE = {};
@@ -42944,63 +43005,24 @@ class PostgresService {
       }
       const tableNameForQueries = correctTableName.toLowerCase();
       console.log("Using table name for queries:", tableNameForQueries);
-      console.log("Trying information_schema approach first");
-      const infoSchemaResult = await this.pgClient`
-                SELECT kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                  AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                  AND tc.table_name = ${tableNameForQueries}
-            `;
-      console.log("Information schema query result:", infoSchemaResult);
-      if (infoSchemaResult.length > 0) {
-        const primaryKeys = infoSchemaResult.map((row) => row.column_name);
-        console.log("Primary keys from information_schema:", primaryKeys);
-        return primaryKeys;
+      console.log("Using pg_index approach to get primary keys");
+      const primaryKeys = await this.pgClient.unsafe(`
+                SELECT a.attname as column_name
+                FROM pg_index i
+                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                JOIN pg_class t ON i.indrelid = t.oid
+                JOIN pg_namespace n ON t.relnamespace = n.oid
+                WHERE n.nspname = 'public'
+                AND t.relname = '${correctTableName}'
+                AND i.indisprimary
+            `);
+      console.log("pg_index query result:", primaryKeys);
+      if (primaryKeys && primaryKeys.length > 0) {
+        const result = primaryKeys.map((row) => row.column_name);
+        console.log("Primary keys from pg_index query:", result);
+        return result;
       }
-      console.log("No primary keys found in information_schema, trying pg_index approach");
-      try {
-        const pgIndexResult = await this.pgClient.unsafe(`
-                    SELECT a.attname as column_name
-                    FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-                    JOIN pg_class t ON i.indrelid = t.oid
-                    JOIN pg_namespace n ON t.relnamespace = n.oid
-                    WHERE n.nspname = 'public'
-                    AND t.relname = '${tableNameForQueries}'
-                    AND i.indisprimary
-                `);
-        console.log("pg_index query result:", pgIndexResult);
-        if (pgIndexResult && pgIndexResult.length > 0) {
-          const primaryKeys = pgIndexResult.map((row) => row.column_name);
-          console.log("Primary keys from pg_index query:", primaryKeys);
-          return primaryKeys;
-        }
-      } catch (pgIndexError) {
-        console.error("Error with pg_index query:", pgIndexError);
-      }
-      console.log("Trying pg_constraint approach as last resort");
-      try {
-        const pgConstraintResult = await this.pgClient.unsafe(`
-                    SELECT a.attname as column_name
-                    FROM pg_constraint c
-                    JOIN pg_class t ON c.conrelid = t.oid
-                    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-                    WHERE c.contype = 'p'
-                    AND t.relname = '${tableNameForQueries}'
-                `);
-        console.log("pg_constraint query result:", pgConstraintResult);
-        if (pgConstraintResult && pgConstraintResult.length > 0) {
-          const primaryKeys = pgConstraintResult.map((row) => row.column_name);
-          console.log("Primary keys from pg_constraint query:", primaryKeys);
-          return primaryKeys;
-        }
-      } catch (pgConstraintError) {
-        console.error("Error with pg_constraint query:", pgConstraintError);
-      }
-      console.log(`No primary keys found for table ${tableName} using any method`);
+      console.log(`No primary keys found for table ${tableName} using pg_index method`);
       return [];
     } catch (error2) {
       console.error("Error getting PostgreSQL primary key:", error2);
@@ -43077,6 +43099,83 @@ class PostgresService {
     } catch (error2) {
       console.error("Error canceling query:", error2);
       return false;
+    }
+  }
+  async getDatabaseSchema() {
+    if (!this.pgClient) {
+      throw new Error("No PostgreSQL connection");
+    }
+    try {
+      const tables = await this.pgClient`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            `;
+      const result = [];
+      for (const table of tables) {
+        const tableName = table.table_name;
+        const columns = await this.pgClient`
+                    SELECT 
+                        column_name, 
+                        data_type,
+                        is_nullable,
+                        column_default,
+                        character_maximum_length,
+                        numeric_precision
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = ${tableName}
+                    ORDER BY ordinal_position
+                `;
+        const primaryKeys = await this.pgClient`
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                      AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+        const primaryKeyColumns = primaryKeys.map((pk) => pk.column_name);
+        const foreignKeys = await this.pgClient`
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_name AS referenced_table_name,
+                        ccu.column_name AS referenced_column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage ccu
+                      ON ccu.constraint_name = tc.constraint_name
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+        const tableInfo = {
+          name: tableName,
+          columns: columns.map((col) => ({
+            name: col.column_name,
+            type: col.data_type,
+            length: col.character_maximum_length,
+            precision: col.numeric_precision,
+            isPrimary: primaryKeyColumns.includes(col.column_name),
+            isNullable: col.is_nullable === "YES",
+            defaultValue: col.column_default
+          })),
+          foreignKeys: foreignKeys.map((fk) => ({
+            column: fk.column_name,
+            referencedTable: fk.referenced_table_name,
+            referencedColumn: fk.referenced_column_name
+          }))
+        };
+        result.push(tableInfo);
+      }
+      return result;
+    } catch (error2) {
+      console.error("Error extracting PostgreSQL database schema:", error2);
+      throw error2;
     }
   }
 }
@@ -43190,6 +43289,12 @@ class DatabaseService {
       throw error2;
     }
   }
+  async getDatabaseSchema() {
+    if (!this.dbType) {
+      throw new Error("No database connection");
+    }
+    return await this.service.getDatabaseSchema();
+  }
 }
 const store = new ElectronStore({
   defaults: {
@@ -43220,6 +43325,25 @@ const queryStore = new ElectronStore({
     queries: {}
   }
 });
+const schemaStore = new ElectronStore({
+  name: "schema-cache",
+  schema: {
+    schemas: {
+      type: "object",
+      additionalProperties: {
+        type: "object",
+        properties: {
+          timestamp: { type: "number" },
+          data: { type: "array" }
+        },
+        required: ["timestamp", "data"]
+      }
+    }
+  },
+  defaults: {
+    schemas: {}
+  }
+});
 const activeConnections = /* @__PURE__ */ new Map();
 const storeService = {
   getConnections: () => {
@@ -43239,6 +43363,11 @@ const storeService = {
     }
     const connections = store.get("connections");
     store.set("connections", connections.filter((conn) => conn.id !== id2));
+    const schemas = schemaStore.get("schemas");
+    if (schemas[id2]) {
+      delete schemas[id2];
+      schemaStore.set("schemas", schemas);
+    }
     return store.get("connections").map((conn) => ({ ...conn }));
   },
   updateAllConnections: (connections) => {
@@ -43419,6 +43548,80 @@ const storeService = {
       throw new Error(`No active connection for ID: ${connectionId}`);
     }
     return await service.cancelQuery();
+  },
+  // Schema cache operations
+  cacheSchema: async (connectionId, schemaData) => {
+    console.log(`Caching schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      schemas[connectionId] = {
+        timestamp: Date.now(),
+        data: schemaData
+      };
+      schemaStore.set("schemas", schemas);
+      return { success: true };
+    } catch (error2) {
+      console.error("Error caching schema:", error2);
+      throw error2;
+    }
+  },
+  getCachedSchema: async (connectionId) => {
+    console.log(`Getting cached schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      const cachedSchema = schemas[connectionId];
+      if (!cachedSchema) {
+        console.log(`No cached schema found for connection ${connectionId}`);
+        return { success: false, cached: false };
+      }
+      const cacheAgeMinutes = (Date.now() - cachedSchema.timestamp) / (1e3 * 60);
+      console.log(`Cache age: ${cacheAgeMinutes.toFixed(2)} minutes`);
+      return {
+        success: true,
+        cached: true,
+        data: cachedSchema.data,
+        timestamp: cachedSchema.timestamp,
+        age: cacheAgeMinutes
+      };
+    } catch (error2) {
+      console.error("Error getting cached schema:", error2);
+      throw error2;
+    }
+  },
+  clearCachedSchema: async (connectionId) => {
+    console.log(`Clearing cached schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      if (schemas[connectionId]) {
+        delete schemas[connectionId];
+        schemaStore.set("schemas", schemas);
+      }
+      return { success: true };
+    } catch (error2) {
+      console.error("Error clearing cached schema:", error2);
+      throw error2;
+    }
+  },
+  getDatabaseSchema: async (connectionId, forceRefresh = false) => {
+    if (!forceRefresh) {
+      try {
+        const cachedResult = await storeService.getCachedSchema(connectionId);
+        if (cachedResult.success && cachedResult.cached) {
+          console.log(`Using cached schema for connection ${connectionId}`);
+          return cachedResult.data;
+        }
+      } catch (error2) {
+        console.error("Error checking for cached schema:", error2);
+      }
+    }
+    console.log(`Fetching fresh schema for connection ${connectionId}`);
+    const service = activeConnections.get(connectionId);
+    if (!service) {
+      throw new Error(`No active connection for ID: ${connectionId}`);
+    }
+    const schemaData = await service.getDatabaseSchema();
+    await storeService.cacheSchema(connectionId, schemaData);
+    return schemaData;
   }
 };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43467,7 +43670,7 @@ app$1.on("activate", () => {
   }
 });
 app$1.whenReady().then(createWindow);
-function createConnectionWindow(connectionId, connectionName) {
+function createConnectionWindow(connectionId) {
   const connectionWindow = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "data-deck-logo.svg"),
     width: 1200,
@@ -43499,9 +43702,9 @@ function createConnectionWindow(connectionId, connectionName) {
   connectionWindows[connectionId] = connectionWindow;
   return connectionWindow.id;
 }
-ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId, connectionName) => {
+ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId) => {
   try {
-    const windowId = createConnectionWindow(connectionId, connectionName);
+    const windowId = createConnectionWindow(connectionId);
     return { success: true, windowId };
   } catch (error2) {
     console.error("Failed to open new window:", error2);
@@ -43749,6 +43952,12 @@ ipcMain$1.handle("delete-query", async (_, args) => {
       error: error2 instanceof Error ? error2.message : "Failed to delete query"
     };
   }
+});
+ipcMain$1.handle("db:getDatabaseSchema", async (_, connectionId, forceRefresh = false) => {
+  return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+});
+ipcMain$1.handle("db:clearSchemaCache", async (_, connectionId) => {
+  return await storeService.clearCachedSchema(connectionId);
 });
 export {
   MAIN_DIST,

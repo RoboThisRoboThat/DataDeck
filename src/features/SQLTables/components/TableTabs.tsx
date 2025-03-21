@@ -1,6 +1,7 @@
-import  { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import type React from 'react';
 import { IoChevronBack, IoChevronForward, IoClose } from 'react-icons/io5';
+import { Button } from '../../../components/ui/button';
 
 interface TableTabsProps {
   tables: string[];
@@ -22,7 +23,7 @@ const TableTabs: React.FC<TableTabsProps> = ({
   });
 
   // Check if scroll buttons should be visible
-  const checkScrollButtons = () => {
+  const checkScrollButtons = useCallback(() => {
     if (tabsRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
       setShowScrollButtons({
@@ -30,14 +31,14 @@ const TableTabs: React.FC<TableTabsProps> = ({
         right: scrollLeft < scrollWidth - clientWidth,
       });
     }
-  };
+  }, []);
 
   // Add scroll event listener
   useEffect(() => {
     checkScrollButtons();
     window.addEventListener('resize', checkScrollButtons);
     return () => window.removeEventListener('resize', checkScrollButtons);
-  }, [tables]);
+  }, [checkScrollButtons]);
 
   // Scroll tabs left or right
   const scrollTabs = (direction: 'left' | 'right') => {
@@ -49,16 +50,17 @@ const TableTabs: React.FC<TableTabsProps> = ({
   };
 
   return (
-    <div className="flex items-center bg-gray-50 border-b border-gray-200">
+    <div className="flex items-center border-b border-border bg-muted/10">
       {/* Left Scroll Button */}
       {showScrollButtons.left && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => scrollTabs('left')}
-          className="flex-none px-1 py-2 hover:bg-gray-200 text-gray-600"
+          className="flex-none p-0 h-9 w-9 rounded-none text-muted-foreground hover:bg-muted"
         >
-          <IoChevronBack className="w-5 h-5" />
-        </button>
+          <IoChevronBack className="w-4 h-4" />
+        </Button>
       )}
 
       {/* Scrollable Tabs Container */}
@@ -68,36 +70,43 @@ const TableTabs: React.FC<TableTabsProps> = ({
         onScroll={checkScrollButtons}
       >
         {tables.map(table => (
-          <button
+          <Button
             key={table}
-            type="button"
+            variant="ghost"
             onClick={() => setActiveTable(table)}
-            className={`group flex-none flex items-center px-4 py-2 text-sm border-r border-gray-200
+            className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm rounded-none transition-colors
               ${activeTable === table 
-                ? 'bg-white border-b-2 border-b-blue-500 text-blue-700' 
-                : 'text-gray-600 hover:bg-gray-100'}`}
+                ? 'bg-background border-t-2 border-t-primary text-foreground font-medium' 
+                : 'text-muted-foreground hover:bg-muted/50'}`}
           >
-            <span>{table}</span>
-            <button
+            <span className="max-w-[150px] truncate">{table}</span>
+            <Button
               type="button"
-              onClick={(e: React.MouseEvent) => handleCloseTable(table, e)}
-              className="ml-2 p-1 rounded-full hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+              variant="ghost"
+              size="icon"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                handleCloseTable(table, e);
+              }}
+              className="ml-2 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label={`Close ${table} tab`}
             >
-              <IoClose className="w-4 h-4" />
-            </button>
-          </button>
+              <IoClose className="w-3 h-3 text-muted-foreground" />
+            </Button>
+          </Button>
         ))}
       </div>
 
       {/* Right Scroll Button */}
       {showScrollButtons.right && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => scrollTabs('right')}
-          className="flex-none px-1 py-2 hover:bg-gray-200 text-gray-600"
+          className="flex-none p-0 h-9 w-9 rounded-none text-muted-foreground hover:bg-muted"
         >
-          <IoChevronForward className="w-5 h-5" />
-        </button>
+          <IoChevronForward className="w-4 h-4" />
+        </Button>
       )}
     </div>
   );

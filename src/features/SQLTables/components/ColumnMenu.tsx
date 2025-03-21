@@ -1,4 +1,4 @@
-import { Menu, MenuItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { IoCaretUp, IoCaretDown, IoFilter } from 'react-icons/io5';
 import type { SortConfig } from '../types';
 import { FILTER_CLICK_EVENT } from './DataTable';
@@ -42,59 +42,48 @@ const ColumnMenu = ({
   };
 
   return (
-    <Menu
-      anchorEl={anchorEl}
-      open={open}
-      onClose={onClose}
-      anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'right',
-      }}
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'right',
-      }}
-    >
-      <div className="px-3 py-2 text-xs text-gray-500 font-medium">
-        Column: {column}
-      </div>
-      <Divider />
-      
-      <MenuItem 
-        onClick={() => onSortAsc(column)}
-        selected={isActiveSortAsc}
-      >
-        <ListItemIcon>
-          <IoCaretUp className={`w-5 h-5 ${isActiveSortAsc ? 'text-blue-600' : 'text-gray-600'}`} />
-        </ListItemIcon>
-        <ListItemText primary="Sort Ascending" />
-      </MenuItem>
-      
-      <MenuItem 
-        onClick={() => onSortDesc(column)}
-        selected={isActiveSortDesc}
-      >
-        <ListItemIcon>
-          <IoCaretDown className={`w-5 h-5 ${isActiveSortDesc ? 'text-blue-600' : 'text-gray-600'}`} />
-        </ListItemIcon>
-        <ListItemText primary="Sort Descending" />
-      </MenuItem>
-      
-      <Divider />
-      
-      <MenuItem 
-        onClick={handleFilterClick}
-        selected={hasFilter}
-      >
-        <ListItemIcon>
-          <IoFilter className={`w-5 h-5 ${hasFilter ? 'text-blue-600' : 'text-gray-600'}`} />
-        </ListItemIcon>
-        <ListItemText 
-          primary="Filter" 
-          secondary={hasFilter ? "Edit current filter" : "Add filter condition"} 
-        />
-      </MenuItem>
-    </Menu>
+    <DropdownMenu open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DropdownMenuTrigger asChild>
+        <div className="hidden">Trigger (hidden, controlled externally)</div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" forceMount>
+        <div className="px-3 py-2 text-xs text-gray-500 font-medium">
+          Column: {column}
+        </div>
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuItem 
+          onClick={() => onSortAsc(column)}
+          className={isActiveSortAsc ? "bg-accent" : ""}
+        >
+          <IoCaretUp className={`w-5 h-5 mr-2 ${isActiveSortAsc ? 'text-blue-600' : 'text-gray-600'}`} />
+          <span>Sort Ascending</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuItem 
+          onClick={() => onSortDesc(column)}
+          className={isActiveSortDesc ? "bg-accent" : ""}
+        >
+          <IoCaretDown className={`w-5 h-5 mr-2 ${isActiveSortDesc ? 'text-blue-600' : 'text-gray-600'}`} />
+          <span>Sort Descending</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuItem 
+          onClick={handleFilterClick}
+          className={hasFilter ? "bg-accent" : ""}
+        >
+          <IoFilter className={`w-5 h-5 mr-2 ${hasFilter ? 'text-blue-600' : 'text-gray-600'}`} />
+          <div className="flex flex-col">
+            <span>Filter</span>
+            <span className="text-xs text-gray-500">
+              {hasFilter ? "Edit current filter" : "Add filter condition"}
+            </span>
+          </div>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useScreen } from '../context/ScreenContext';
 import { AddConnectionModal } from '../components/AddConnectionModal';
-import { FaTrash, FaPlus } from 'react-icons/fa';
+import { Trash, Plus, ExternalLink } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Layout } from '../components/Layout';
 import type { Connection } from '../types/connection';
-
+import { useTheme } from '../context/ThemeContext';
 export function ConnectionScreen() {
+  const { theme } = useTheme();
   const { setCurrentScreen, setActiveConnectionId, setActiveConnectionName } = useScreen();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -118,83 +121,84 @@ export function ConnectionScreen() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Database Connections</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
-        >
-          <FaPlus className="text-sm" />
-          Add Connection
-        </button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      {notification && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          {notification}
-        </div>
-      )}
-
-      <div className="bg-white rounded-lg shadow">
-        {connections.map(connection => (
-          <div
-            key={connection.id}
-            className="border-b border-gray-200 last:border-b-0"
-          >
-            <div
-              onClick={() => handleConnect(connection)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleConnect(connection);
-                }
-              }}
-              className="flex justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+    <Layout title="Data Deck" showThemeToggle={false}>
+      <div className="flex-1 p-4 overflow-auto">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium">Database Connections</h2>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsModalOpen(true)}
+              className={`flex items-center gap-1.5 ${theme === 'dark' ? 'text-white' : 'text-black'}`}
             >
-              <div className="flex-1">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {connection.name}
-                </h3>
-                <div className="mt-1 text-sm text-gray-500">
-                  {connection.host}:{connection.port} • {connection.database} • {connection.dbType === 'mysql' ? 'MySQL' : 'PostgreSQL'}
-                </div>
-              </div>
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteConnection(connection.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation();
-                    handleDeleteConnection(connection.id);
-                  }
-                }}
-                className="ml-4"
-              >
-                <button 
-                  type="button"
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <FaTrash className="text-gray-500 hover:text-red-600 transition-colors" />
-                </button>
-              </div>
+              <Plus className="size-4" color={theme === 'dark' ? 'white' : 'black'} />
+              Add Connection
+            </Button>
+          </div>
+
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md mb-4 dark:border-destructive/30">
+              {error}
             </div>
+          )}
+
+          {notification && (
+            <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-md mb-4 dark:bg-green-900/20 dark:border-green-800/30 dark:text-green-400">
+              {notification}
+            </div>
+          )}
+
+          <div className="bg-card rounded-lg shadow-sm border border-border">
+            {connections.map(connection => (
+              <div
+                key={connection.id}
+                className="border-b border-border last:border-b-0"
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => handleConnect(connection)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      handleConnect(connection);
+                    }
+                  }}
+                  className="flex justify-between p-4 w-full text-left hover:bg-muted/40 h-auto"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-medium">{connection.name}</h3>
+                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        {connection.dbType === 'mysql' ? 'MySQL' : 'PostgreSQL'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+                      <ExternalLink className="size-3.5" />
+                      {connection.host}:{connection.port} • {connection.database}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteConnection(connection.id);
+                    }}
+                  >
+                    <Trash className="size-4" />
+                  </Button>
+                </Button>
+              </div>
+            ))}
+            
+            {connections.length === 0 && (
+              <div className="px-6 py-8 text-center text-muted-foreground">
+                No connections added yet. Click the "Add Connection" button to get started.
+              </div>
+            )}
           </div>
-        ))}
-        
-        {connections.length === 0 && (
-          <div className="px-6 py-8 text-center text-gray-500">
-            No connections added yet. Click the "Add Connection" button to get started.
-          </div>
-        )}
+        </div>
       </div>
 
       <AddConnectionModal
@@ -202,6 +206,6 @@ export function ConnectionScreen() {
         onClose={() => setIsModalOpen(false)}
         onAdd={handleAddConnection}
       />
-    </div>
+    </Layout>
   );
 } 

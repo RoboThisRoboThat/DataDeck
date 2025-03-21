@@ -29,13 +29,13 @@ const TableList = ({
   };
 
   return (
-    <div className="w-64 min-w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
+    <div  className="w-64 min-w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
+      <div className="p-4 border-b border-gray-200 bg-gray-50">
         <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">Tables</h2>
         
         {/* Search Input */}
-        <div className="mb-2">
-          <div className="relative">
+        <div className="mb-2 h-[30px]">
+          <div>
             <input
               type="text"
               value={tableSearch}
@@ -60,7 +60,7 @@ const TableList = ({
       </div>
 
       {/* Scrollable Table List */}
-      <div className="overflow-y-auto flex-1 p-4 pt-2">
+      <div className="overflow-y-auto p-4 pt-2 flex-1" style={{ maxHeight: 'calc(100vh - 220px)' }}>
         <div className="space-y-0.5">
           {getFilteredTables().map(table => (
             <button

@@ -144,6 +144,13 @@ class DatabaseService {
             throw error
         }
     }
+    async getDatabaseSchema() {
+        if (!this.dbType) {
+            throw new Error('No database connection')
+        }
+
+        return await this.service.getDatabaseSchema()
+    }
 }
 
 export default DatabaseService;

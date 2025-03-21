@@ -18,6 +18,23 @@ declare global {
             ) => Promise<boolean>;
             isConnected: (connectionId: string) => Promise<boolean>;
             getActiveConnections: () => Promise<string[]>;
+            getDatabaseSchema: (connectionId: string) => Promise<{
+                name: string;
+                columns: Array<{
+                    name: string;
+                    type: string;
+                    length?: number;
+                    precision?: number;
+                    isPrimary: boolean;
+                    isNullable: boolean;
+                    defaultValue?: string;
+                }>;
+                foreignKeys: Array<{
+                    column: string;
+                    referencedTable: string;
+                    referencedColumn: string;
+                }>;
+            }[]>;
         };
 
         store: {
