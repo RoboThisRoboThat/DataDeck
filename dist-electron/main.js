@@ -43005,63 +43005,24 @@ class PostgresService {
       }
       const tableNameForQueries = correctTableName.toLowerCase();
       console.log("Using table name for queries:", tableNameForQueries);
-      console.log("Trying information_schema approach first");
-      const infoSchemaResult = await this.pgClient`
-                SELECT kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                  AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                  AND tc.table_name = ${tableNameForQueries}
-            `;
-      console.log("Information schema query result:", infoSchemaResult);
-      if (infoSchemaResult.length > 0) {
-        const primaryKeys = infoSchemaResult.map((row) => row.column_name);
-        console.log("Primary keys from information_schema:", primaryKeys);
-        return primaryKeys;
+      console.log("Using pg_index approach to get primary keys");
+      const primaryKeys = await this.pgClient.unsafe(`
+                SELECT a.attname as column_name
+                FROM pg_index i
+                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                JOIN pg_class t ON i.indrelid = t.oid
+                JOIN pg_namespace n ON t.relnamespace = n.oid
+                WHERE n.nspname = 'public'
+                AND t.relname = '${correctTableName}'
+                AND i.indisprimary
+            `);
+      console.log("pg_index query result:", primaryKeys);
+      if (primaryKeys && primaryKeys.length > 0) {
+        const result = primaryKeys.map((row) => row.column_name);
+        console.log("Primary keys from pg_index query:", result);
+        return result;
       }
-      console.log("No primary keys found in information_schema, trying pg_index approach");
-      try {
-        const pgIndexResult = await this.pgClient.unsafe(`
-                    SELECT a.attname as column_name
-                    FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-                    JOIN pg_class t ON i.indrelid = t.oid
-                    JOIN pg_namespace n ON t.relnamespace = n.oid
-                    WHERE n.nspname = 'public'
-                    AND t.relname = '${tableNameForQueries}'
-                    AND i.indisprimary
-                `);
-        console.log("pg_index query result:", pgIndexResult);
-        if (pgIndexResult && pgIndexResult.length > 0) {
-          const primaryKeys = pgIndexResult.map((row) => row.column_name);
-          console.log("Primary keys from pg_index query:", primaryKeys);
-          return primaryKeys;
-        }
-      } catch (pgIndexError) {
-        console.error("Error with pg_index query:", pgIndexError);
-      }
-      console.log("Trying pg_constraint approach as last resort");
-      try {
-        const pgConstraintResult = await this.pgClient.unsafe(`
-                    SELECT a.attname as column_name
-                    FROM pg_constraint c
-                    JOIN pg_class t ON c.conrelid = t.oid
-                    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-                    WHERE c.contype = 'p'
-                    AND t.relname = '${tableNameForQueries}'
-                `);
-        console.log("pg_constraint query result:", pgConstraintResult);
-        if (pgConstraintResult && pgConstraintResult.length > 0) {
-          const primaryKeys = pgConstraintResult.map((row) => row.column_name);
-          console.log("Primary keys from pg_constraint query:", primaryKeys);
-          return primaryKeys;
-        }
-      } catch (pgConstraintError) {
-        console.error("Error with pg_constraint query:", pgConstraintError);
-      }
-      console.log(`No primary keys found for table ${tableName} using any method`);
+      console.log(`No primary keys found for table ${tableName} using pg_index method`);
       return [];
     } catch (error2) {
       console.error("Error getting PostgreSQL primary key:", error2);
