@@ -71,7 +71,7 @@ app.on('activate', () => {
 app.whenReady().then(createWindow)
 
 // Function to create a new connection window
-function createConnectionWindow(connectionId: string, connectionName: string) {
+function createConnectionWindow(connectionId: string) {
   // Create a new browser window
   const connectionWindow = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'data-deck-logo.svg'),
@@ -120,10 +120,10 @@ function createConnectionWindow(connectionId: string, connectionName: string) {
 }
 
 // IPC handler to open a new connection window
-ipcMain.handle('window:openConnectionWindow', async (_, connectionId, connectionName) => {
+ipcMain.handle('window:openConnectionWindow', async (_, connectionId) => {
   try {
     // Simply create a new window every time
-    const windowId = createConnectionWindow(connectionId, connectionName);
+    const windowId = createConnectionWindow(connectionId);
     return { success: true, windowId };
   } catch (error) {
     console.error('Failed to open new window:', error);
@@ -427,4 +427,13 @@ ipcMain.handle('delete-query', async (_, args) => {
       error: error instanceof Error ? error.message : 'Failed to delete query'
     };
   }
+});
+
+ipcMain.handle('db:getDatabaseSchema', async (_, connectionId, forceRefresh = false) => {
+  return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+});
+
+// Add a new handler specifically for clearing the schema cache
+ipcMain.handle('db:clearSchemaCache', async (_, connectionId) => {
+  return await storeService.clearCachedSchema(connectionId);
 });

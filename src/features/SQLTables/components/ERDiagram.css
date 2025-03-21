@@ -1,0 +1,175 @@
+.react-flow__node-tableNode {
+  min-width: 150px;
+  border: none;
+  border-radius: 3px;
+  padding: 0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background-color: #555;
+  opacity: 0.75;
+  border-radius: 100%;
+}
+
+.react-flow__handle.source-handle {
+  background-color: #ff8c00;
+  right: -4px;
+}
+
+.react-flow__handle.target-handle {
+  background-color: #4a6da7;
+  left: -4px;
+}
+
+/* Hide table handles by default, show on hover */
+.react-flow__handle.table-handle {
+  width: 10px;
+  height: 10px;
+  opacity: 0.2;
+}
+
+.react-flow__node:hover .react-flow__handle.table-handle {
+  opacity: 0.8;
+}
+
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-width: 2;
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+.primary-key {
+  font-weight: bold;
+  color: #ff8c00;
+}
+
+.foreign-key {
+  color: #4a6da7;
+  text-decoration: underline dotted;
+}
+
+/* Group styling */
+.group-node {
+  position: relative;
+  z-index: -1;
+  pointer-events: all;
+  user-select: none;
+  cursor: grab;
+}
+
+.group-node:active {
+  cursor: grabbing;
+}
+
+.group-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Minimap styling */
+.react-flow__minimap {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.1);
+}
+
+/* Table hover effect */
+.react-flow__node-tableNode:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 1000 !important;
+}
+
+/* Group highlighting on hover */
+.group-node:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.dark .group-node:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Make labels more readable */
+.react-flow__edge-textbg {
+  filter: blur(2px);
+}
+
+/* Hide node selection border */
+.react-flow__node.selected {
+  box-shadow: none;
+}
+
+/* Enhanced isolated table styling */
+.react-flow__node-tableNode[data-isolated="true"] {
+  border-left: 3px solid #cbd5e0;
+}
+
+/* Group background styling */
+.group-background {
+  border-radius: 10px;
+  background-color: rgba(240, 240, 240, 0.2);
+  border: 1px dashed #cbd5e0;
+  z-index: -1;
+}
+
+.dark .group-background {
+  background-color: rgba(30, 30, 30, 0.2);
+  border: 1px dashed #4a5568;
+}
+
+.react-flow__node {
+  cursor: pointer !important;
+}
+
+.handle {
+  opacity: 0;
+  transition: opacity 0.2s;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.react-flow__node:hover .handle {
+  opacity: 0.6;
+}
+
+.handle:hover {
+  opacity: 1 !important;
+}
+
+.table-handle {
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide the node selection border */
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  display: none;
+} 

@@ -2,6 +2,29 @@ import Store from 'electron-store';
 import type { Connection } from '../../src/types/connection';
 import DatabaseService from './database.service';
 
+// Define TableSchema interface
+interface TableSchemaColumn {
+    name: string;
+    type: string;
+    length?: number;
+    precision?: number;
+    isPrimary: boolean;
+    isNullable: boolean;
+    defaultValue?: string;
+}
+
+interface TableSchemaForeignKey {
+    column: string;
+    referencedTable: string;
+    referencedColumn: string;
+}
+
+interface TableSchema {
+    name: string;
+    columns: TableSchemaColumn[];
+    foreignKeys: TableSchemaForeignKey[];
+}
+
 interface StoreSchema {
     connections: Connection[];
 }
@@ -17,6 +40,16 @@ interface QueryStoreSchema {
     queries: {
         [connectionId: string]: {
             [queryName: string]: SavedQuery;
+        };
+    };
+}
+
+// Schema cache interface
+interface SchemaCache {
+    schemas: {
+        [connectionId: string]: {
+            timestamp: number;
+            data: TableSchema[];
         };
     };
 }
@@ -53,6 +86,27 @@ const queryStore = new Store<QueryStoreSchema>({
     }
 });
 
+// Schema cache store
+const schemaStore = new Store<SchemaCache>({
+    name: 'schema-cache',
+    schema: {
+        schemas: {
+            type: 'object',
+            additionalProperties: {
+                type: 'object',
+                properties: {
+                    timestamp: { type: 'number' },
+                    data: { type: 'array' }
+                },
+                required: ['timestamp', 'data']
+            }
+        }
+    },
+    defaults: {
+        schemas: {}
+    }
+});
+
 // Map to store active database service instances
 const activeConnections = new Map<string, DatabaseService>();
 
@@ -78,6 +132,14 @@ export const storeService = {
 
         const connections = store.get('connections');
         store.set('connections', connections.filter(conn => conn.id !== id));
+
+        // Also clear any cached schema for this connection
+        const schemas = schemaStore.get('schemas');
+        if (schemas[id]) {
+            delete schemas[id];
+            schemaStore.set('schemas', schemas);
+        }
+
         return store.get('connections').map(conn => ({ ...conn })); // Return plain objects
     },
 
@@ -335,4 +397,103 @@ export const storeService = {
         }
         return await service.cancelQuery();
     },
+
+    // Schema cache operations
+    cacheSchema: async (connectionId: string, schemaData: TableSchema[]) => {
+        console.log(`Caching schema for connection ${connectionId}`);
+
+        try {
+            const schemas = schemaStore.get('schemas');
+
+            // Store the schema with a timestamp
+            schemas[connectionId] = {
+                timestamp: Date.now(),
+                data: schemaData
+            };
+
+            schemaStore.set('schemas', schemas);
+            return { success: true };
+        } catch (error) {
+            console.error('Error caching schema:', error);
+            throw error;
+        }
+    },
+
+    getCachedSchema: async (connectionId: string) => {
+        console.log(`Getting cached schema for connection ${connectionId}`);
+
+        try {
+            const schemas = schemaStore.get('schemas');
+            const cachedSchema = schemas[connectionId];
+
+            if (!cachedSchema) {
+                console.log(`No cached schema found for connection ${connectionId}`);
+                return { success: false, cached: false };
+            }
+
+            // Get cache age in minutes
+            const cacheAgeMinutes = (Date.now() - cachedSchema.timestamp) / (1000 * 60);
+            console.log(`Cache age: ${cacheAgeMinutes.toFixed(2)} minutes`);
+
+            return {
+                success: true,
+                cached: true,
+                data: cachedSchema.data,
+                timestamp: cachedSchema.timestamp,
+                age: cacheAgeMinutes
+            };
+        } catch (error) {
+            console.error('Error getting cached schema:', error);
+            throw error;
+        }
+    },
+
+    clearCachedSchema: async (connectionId: string) => {
+        console.log(`Clearing cached schema for connection ${connectionId}`);
+
+        try {
+            const schemas = schemaStore.get('schemas');
+
+            if (schemas[connectionId]) {
+                delete schemas[connectionId];
+                schemaStore.set('schemas', schemas);
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing cached schema:', error);
+            throw error;
+        }
+    },
+
+    getDatabaseSchema: async (connectionId: string, forceRefresh = false) => {
+        // Check if there's a cached schema first
+        if (!forceRefresh) {
+            try {
+                const cachedResult = await storeService.getCachedSchema(connectionId);
+                if (cachedResult.success && cachedResult.cached) {
+                    console.log(`Using cached schema for connection ${connectionId}`);
+                    return cachedResult.data;
+                }
+            } catch (error) {
+                console.error('Error checking for cached schema:', error);
+                // Continue with live fetch if cache check fails
+            }
+        }
+
+        // If no cache or force refresh, get fresh data
+        console.log(`Fetching fresh schema for connection ${connectionId}`);
+        const service = activeConnections.get(connectionId);
+        if (!service) {
+            throw new Error(`No active connection for ID: ${connectionId}`);
+        }
+
+        // Get fresh schema
+        const schemaData = await service.getDatabaseSchema();
+
+        // Cache the fresh schema
+        await storeService.cacheSchema(connectionId, schemaData);
+
+        return schemaData;
+    }
 };

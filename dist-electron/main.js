@@ -33436,21 +33436,27 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-field_flags.NOT_NULL = 1;
-field_flags.PRI_KEY = 2;
-field_flags.UNIQUE_KEY = 4;
-field_flags.MULTIPLE_KEY = 8;
-field_flags.BLOB = 16;
-field_flags.UNSIGNED = 32;
-field_flags.ZEROFILL = 64;
-field_flags.BINARY = 128;
-field_flags.ENUM = 256;
-field_flags.AUTO_INCREMENT = 512;
-field_flags.TIMESTAMP = 1024;
-field_flags.SET = 2048;
-field_flags.NO_DEFAULT_VALUE = 4096;
-field_flags.ON_UPDATE_NOW = 8192;
-field_flags.NUM = 32768;
+var hasRequiredField_flags;
+function requireField_flags() {
+  if (hasRequiredField_flags) return field_flags;
+  hasRequiredField_flags = 1;
+  field_flags.NOT_NULL = 1;
+  field_flags.PRI_KEY = 2;
+  field_flags.UNIQUE_KEY = 4;
+  field_flags.MULTIPLE_KEY = 8;
+  field_flags.BLOB = 16;
+  field_flags.UNSIGNED = 32;
+  field_flags.ZEROFILL = 64;
+  field_flags.BINARY = 128;
+  field_flags.ENUM = 256;
+  field_flags.AUTO_INCREMENT = 512;
+  field_flags.TIMESTAMP = 1024;
+  field_flags.SET = 2048;
+  field_flags.NO_DEFAULT_VALUE = 4096;
+  field_flags.ON_UPDATE_NOW = 8192;
+  field_flags.NUM = 32768;
+  return field_flags;
+}
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33514,7 +33520,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = field_flags;
+    const fiedFlags = requireField_flags();
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36408,7 +36414,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$7 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = field_flags;
+const FieldFlags = requireField_flags();
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -40753,6 +40759,67 @@ class MySQLService {
       return false;
     }
   }
+  async getDatabaseSchema() {
+    if (!this.connection) {
+      throw new Error("No MySQL connection");
+    }
+    try {
+      const [tables] = await this.connection.execute(`
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE()
+            `);
+      const result = [];
+      for (const table of tables) {
+        const tableName = table.TABLE_NAME;
+        const [columns] = await this.connection.execute(`
+                    SELECT 
+                        COLUMN_NAME, 
+                        DATA_TYPE,
+                        IS_NULLABLE,
+                        COLUMN_KEY,
+                        COLUMN_DEFAULT,
+                        CHARACTER_MAXIMUM_LENGTH,
+                        NUMERIC_PRECISION
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                `, [tableName]);
+        const [foreignKeys] = await this.connection.execute(`
+                    SELECT
+                        COLUMN_NAME,
+                        REFERENCED_TABLE_NAME,
+                        REFERENCED_COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                    AND REFERENCED_TABLE_NAME IS NOT NULL
+                `, [tableName]);
+        const tableInfo = {
+          name: tableName,
+          columns: columns.map((col) => ({
+            name: col.COLUMN_NAME,
+            type: col.DATA_TYPE,
+            length: col.CHARACTER_MAXIMUM_LENGTH,
+            precision: col.NUMERIC_PRECISION,
+            isPrimary: col.COLUMN_KEY === "PRI",
+            isNullable: col.IS_NULLABLE === "YES",
+            defaultValue: col.COLUMN_DEFAULT
+          })),
+          foreignKeys: foreignKeys.map((fk) => ({
+            column: fk.COLUMN_NAME,
+            referencedTable: fk.REFERENCED_TABLE_NAME,
+            referencedColumn: fk.REFERENCED_COLUMN_NAME
+          }))
+        };
+        result.push(tableInfo);
+      }
+      return result;
+    } catch (error2) {
+      console.error("Error extracting MySQL database schema:", error2);
+      throw error2;
+    }
+  }
 }
 const originCache = /* @__PURE__ */ new Map(), originStackCache = /* @__PURE__ */ new Map(), originError = Symbol("OriginError");
 const CLOSE = {};
@@ -43073,6 +43140,83 @@ class PostgresService {
       return false;
     }
   }
+  async getDatabaseSchema() {
+    if (!this.pgClient) {
+      throw new Error("No PostgreSQL connection");
+    }
+    try {
+      const tables = await this.pgClient`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            `;
+      const result = [];
+      for (const table of tables) {
+        const tableName = table.table_name;
+        const columns = await this.pgClient`
+                    SELECT 
+                        column_name, 
+                        data_type,
+                        is_nullable,
+                        column_default,
+                        character_maximum_length,
+                        numeric_precision
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = ${tableName}
+                    ORDER BY ordinal_position
+                `;
+        const primaryKeys = await this.pgClient`
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                      AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+        const primaryKeyColumns = primaryKeys.map((pk) => pk.column_name);
+        const foreignKeys = await this.pgClient`
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_name AS referenced_table_name,
+                        ccu.column_name AS referenced_column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage ccu
+                      ON ccu.constraint_name = tc.constraint_name
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+        const tableInfo = {
+          name: tableName,
+          columns: columns.map((col) => ({
+            name: col.column_name,
+            type: col.data_type,
+            length: col.character_maximum_length,
+            precision: col.numeric_precision,
+            isPrimary: primaryKeyColumns.includes(col.column_name),
+            isNullable: col.is_nullable === "YES",
+            defaultValue: col.column_default
+          })),
+          foreignKeys: foreignKeys.map((fk) => ({
+            column: fk.column_name,
+            referencedTable: fk.referenced_table_name,
+            referencedColumn: fk.referenced_column_name
+          }))
+        };
+        result.push(tableInfo);
+      }
+      return result;
+    } catch (error2) {
+      console.error("Error extracting PostgreSQL database schema:", error2);
+      throw error2;
+    }
+  }
 }
 class DatabaseService {
   constructor(dbType) {
@@ -43184,6 +43328,12 @@ class DatabaseService {
       throw error2;
     }
   }
+  async getDatabaseSchema() {
+    if (!this.dbType) {
+      throw new Error("No database connection");
+    }
+    return await this.service.getDatabaseSchema();
+  }
 }
 const store = new ElectronStore({
   defaults: {
@@ -43214,6 +43364,25 @@ const queryStore = new ElectronStore({
     queries: {}
   }
 });
+const schemaStore = new ElectronStore({
+  name: "schema-cache",
+  schema: {
+    schemas: {
+      type: "object",
+      additionalProperties: {
+        type: "object",
+        properties: {
+          timestamp: { type: "number" },
+          data: { type: "array" }
+        },
+        required: ["timestamp", "data"]
+      }
+    }
+  },
+  defaults: {
+    schemas: {}
+  }
+});
 const activeConnections = /* @__PURE__ */ new Map();
 const storeService = {
   getConnections: () => {
@@ -43233,6 +43402,11 @@ const storeService = {
     }
     const connections = store.get("connections");
     store.set("connections", connections.filter((conn) => conn.id !== id2));
+    const schemas = schemaStore.get("schemas");
+    if (schemas[id2]) {
+      delete schemas[id2];
+      schemaStore.set("schemas", schemas);
+    }
     return store.get("connections").map((conn) => ({ ...conn }));
   },
   updateAllConnections: (connections) => {
@@ -43413,6 +43587,80 @@ const storeService = {
       throw new Error(`No active connection for ID: ${connectionId}`);
     }
     return await service.cancelQuery();
+  },
+  // Schema cache operations
+  cacheSchema: async (connectionId, schemaData) => {
+    console.log(`Caching schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      schemas[connectionId] = {
+        timestamp: Date.now(),
+        data: schemaData
+      };
+      schemaStore.set("schemas", schemas);
+      return { success: true };
+    } catch (error2) {
+      console.error("Error caching schema:", error2);
+      throw error2;
+    }
+  },
+  getCachedSchema: async (connectionId) => {
+    console.log(`Getting cached schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      const cachedSchema = schemas[connectionId];
+      if (!cachedSchema) {
+        console.log(`No cached schema found for connection ${connectionId}`);
+        return { success: false, cached: false };
+      }
+      const cacheAgeMinutes = (Date.now() - cachedSchema.timestamp) / (1e3 * 60);
+      console.log(`Cache age: ${cacheAgeMinutes.toFixed(2)} minutes`);
+      return {
+        success: true,
+        cached: true,
+        data: cachedSchema.data,
+        timestamp: cachedSchema.timestamp,
+        age: cacheAgeMinutes
+      };
+    } catch (error2) {
+      console.error("Error getting cached schema:", error2);
+      throw error2;
+    }
+  },
+  clearCachedSchema: async (connectionId) => {
+    console.log(`Clearing cached schema for connection ${connectionId}`);
+    try {
+      const schemas = schemaStore.get("schemas");
+      if (schemas[connectionId]) {
+        delete schemas[connectionId];
+        schemaStore.set("schemas", schemas);
+      }
+      return { success: true };
+    } catch (error2) {
+      console.error("Error clearing cached schema:", error2);
+      throw error2;
+    }
+  },
+  getDatabaseSchema: async (connectionId, forceRefresh = false) => {
+    if (!forceRefresh) {
+      try {
+        const cachedResult = await storeService.getCachedSchema(connectionId);
+        if (cachedResult.success && cachedResult.cached) {
+          console.log(`Using cached schema for connection ${connectionId}`);
+          return cachedResult.data;
+        }
+      } catch (error2) {
+        console.error("Error checking for cached schema:", error2);
+      }
+    }
+    console.log(`Fetching fresh schema for connection ${connectionId}`);
+    const service = activeConnections.get(connectionId);
+    if (!service) {
+      throw new Error(`No active connection for ID: ${connectionId}`);
+    }
+    const schemaData = await service.getDatabaseSchema();
+    await storeService.cacheSchema(connectionId, schemaData);
+    return schemaData;
   }
 };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43461,7 +43709,7 @@ app$1.on("activate", () => {
   }
 });
 app$1.whenReady().then(createWindow);
-function createConnectionWindow(connectionId, connectionName) {
+function createConnectionWindow(connectionId) {
   const connectionWindow = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "data-deck-logo.svg"),
     width: 1200,
@@ -43493,9 +43741,9 @@ function createConnectionWindow(connectionId, connectionName) {
   connectionWindows[connectionId] = connectionWindow;
   return connectionWindow.id;
 }
-ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId, connectionName) => {
+ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId) => {
   try {
-    const windowId = createConnectionWindow(connectionId, connectionName);
+    const windowId = createConnectionWindow(connectionId);
     return { success: true, windowId };
   } catch (error2) {
     console.error("Failed to open new window:", error2);
@@ -43743,6 +43991,12 @@ ipcMain$1.handle("delete-query", async (_, args) => {
       error: error2 instanceof Error ? error2.message : "Failed to delete query"
     };
   }
+});
+ipcMain$1.handle("db:getDatabaseSchema", async (_, connectionId, forceRefresh = false) => {
+  return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+});
+ipcMain$1.handle("db:clearSchemaCache", async (_, connectionId) => {
+  return await storeService.clearCachedSchema(connectionId);
 });
 export {
   MAIN_DIST,

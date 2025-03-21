@@ -350,6 +350,98 @@ class PostgresService {
             return false;
         }
     }
+
+    async getDatabaseSchema() {
+        if (!this.pgClient) {
+            throw new Error('No PostgreSQL connection');
+        }
+
+        try {
+            // Get all tables in the public schema
+            const tables = await this.pgClient`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            `;
+
+            const result = [];
+
+            for (const table of tables) {
+                const tableName = table.table_name;
+
+                // Get columns with their properties
+                const columns = await this.pgClient`
+                    SELECT 
+                        column_name, 
+                        data_type,
+                        is_nullable,
+                        column_default,
+                        character_maximum_length,
+                        numeric_precision
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = ${tableName}
+                    ORDER BY ordinal_position
+                `;
+
+                // Get primary key columns
+                const primaryKeys = await this.pgClient`
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                      AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+
+                const primaryKeyColumns = primaryKeys.map(pk => pk.column_name);
+
+                // Get foreign keys
+                const foreignKeys = await this.pgClient`
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_name AS referenced_table_name,
+                        ccu.column_name AS referenced_column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage ccu
+                      ON ccu.constraint_name = tc.constraint_name
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = 'public'
+                      AND tc.table_name = ${tableName}
+                `;
+
+                const tableInfo = {
+                    name: tableName,
+                    columns: columns.map(col => ({
+                        name: col.column_name,
+                        type: col.data_type,
+                        length: col.character_maximum_length,
+                        precision: col.numeric_precision,
+                        isPrimary: primaryKeyColumns.includes(col.column_name),
+                        isNullable: col.is_nullable === 'YES',
+                        defaultValue: col.column_default
+                    })),
+                    foreignKeys: foreignKeys.map(fk => ({
+                        column: fk.column_name,
+                        referencedTable: fk.referenced_table_name,
+                        referencedColumn: fk.referenced_column_name
+                    }))
+                };
+
+                result.push(tableInfo);
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error extracting PostgreSQL database schema:', error);
+            throw error;
+        }
+    }
 }
 
 export default PostgresService; 

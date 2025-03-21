@@ -139,6 +139,79 @@ class MySQLService {
             return false;
         }
     }
+
+    async getDatabaseSchema() {
+        if (!this.connection) {
+            throw new Error('No MySQL connection');
+        }
+
+        try {
+            // Get all tables
+            const [tables] = await this.connection.execute(`
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE()
+            `);
+
+            const result = [];
+
+            for (const table of tables as any[]) {
+                const tableName = table.TABLE_NAME;
+
+                // Get columns with their properties
+                const [columns] = await this.connection.execute(`
+                    SELECT 
+                        COLUMN_NAME, 
+                        DATA_TYPE,
+                        IS_NULLABLE,
+                        COLUMN_KEY,
+                        COLUMN_DEFAULT,
+                        CHARACTER_MAXIMUM_LENGTH,
+                        NUMERIC_PRECISION
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                `, [tableName]);
+
+                // Get foreign keys
+                const [foreignKeys] = await this.connection.execute(`
+                    SELECT
+                        COLUMN_NAME,
+                        REFERENCED_TABLE_NAME,
+                        REFERENCED_COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = ?
+                    AND REFERENCED_TABLE_NAME IS NOT NULL
+                `, [tableName]);
+
+                const tableInfo = {
+                    name: tableName,
+                    columns: (columns as any[]).map(col => ({
+                        name: col.COLUMN_NAME,
+                        type: col.DATA_TYPE,
+                        length: col.CHARACTER_MAXIMUM_LENGTH,
+                        precision: col.NUMERIC_PRECISION,
+                        isPrimary: col.COLUMN_KEY === 'PRI',
+                        isNullable: col.IS_NULLABLE === 'YES',
+                        defaultValue: col.COLUMN_DEFAULT
+                    })),
+                    foreignKeys: (foreignKeys as any[]).map(fk => ({
+                        column: fk.COLUMN_NAME,
+                        referencedTable: fk.REFERENCED_TABLE_NAME,
+                        referencedColumn: fk.REFERENCED_COLUMN_NAME
+                    }))
+                };
+
+                result.push(tableInfo);
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error extracting MySQL database schema:', error);
+            throw error;
+        }
+    }
 }
 
 export default MySQLService;

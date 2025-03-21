@@ -3,6 +3,7 @@ import TableList from './components/TableList';
 import TableTabs from './components/TableTabs';
 import DataTable from './components/DataTable';
 import QueryPanel from '../QueryPanel';
+import ERDiagram from './components/ERDiagram';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 
@@ -119,6 +120,12 @@ function SQLTables({ connectionId }: SQLTablesProps) {
             >
               Query
             </TabsTrigger>
+            <TabsTrigger 
+              value="er-diagram" 
+              className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+            >
+              ER Diagram
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -195,6 +202,12 @@ function SQLTables({ connectionId }: SQLTablesProps) {
         <TabsContent value="query" className="flex-1 h-full mt-0 border-none p-0">
           <div id='query-panel-container' className="h-full">
             <QueryPanel connectionId={connectionId} />
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="er-diagram" className="flex-1 h-full mt-0 border-none p-0">
+          <div id='er-diagram-container' className="h-full">
+            <ERDiagram connectionId={connectionId} />
           </div>
         </TabsContent>
       </Tabs>
