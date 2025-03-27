@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('store', {
     getConnections: () => ipcRenderer.invoke('store:getConnections'),
     addConnection: (connection) => ipcRenderer.invoke('store:addConnection', connection),
     deleteConnection: (id) => ipcRenderer.invoke('store:deleteConnection', id),
+    getSettings: () => ipcRenderer.invoke('store:getSettings'),
+    updateSettings: (settings) => ipcRenderer.invoke('store:updateSettings', settings),
+    updateAISettings: (aiSettings) => ipcRenderer.invoke('store:updateAISettings', aiSettings),
 })
 
 // Expose ipcRenderer.on

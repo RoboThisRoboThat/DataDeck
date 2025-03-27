@@ -437,3 +437,16 @@ ipcMain.handle('db:getDatabaseSchema', async (_, connectionId, forceRefresh = fa
 ipcMain.handle('db:clearSchemaCache', async (_, connectionId) => {
   return await storeService.clearCachedSchema(connectionId);
 });
+
+// Add these handlers near the other store management IPC handlers
+ipcMain.handle('store:getSettings', () => {
+  return storeService.getSettings();
+});
+
+ipcMain.handle('store:updateSettings', (_, settings) => {
+  return storeService.updateSettings(settings);
+});
+
+ipcMain.handle('store:updateAISettings', (_, aiSettings) => {
+  return storeService.updateAISettings(aiSettings);
+});

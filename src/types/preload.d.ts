@@ -1,3 +1,6 @@
+import type { Connection } from './connection';
+import type { AppSettings, AISettings } from './settings';
+
 declare global {
     interface Window {
         database: {
@@ -21,6 +24,9 @@ declare global {
             deleteConnection: (id: string) => Promise<Connection[]>;
             isConnected: (connectionId: string) => Promise<boolean>;
             getActiveConnections: () => Promise<string[]>;
+            getSettings: () => Promise<AppSettings>;
+            updateSettings: (settings: AppSettings) => Promise<AppSettings>;
+            updateAISettings: (aiSettings: AISettings) => Promise<AISettings>;
         };
         windowManager: {
             openConnectionWindow: (connectionId: string, connectionName: string, urlParams?: string) => Promise<{

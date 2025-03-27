@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import type { Connection } from '../src/types/connection'
+import type { AppSettings, AISettings } from '../src/types/settings'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
@@ -145,6 +146,11 @@ contextBridge.exposeInMainWorld('store', {
   getConnections: () => ipcRenderer.invoke('store:getConnections'),
   addConnection: (connection: Connection) => ipcRenderer.invoke('store:addConnection', connection),
   deleteConnection: (id: string) => ipcRenderer.invoke('store:deleteConnection', id),
+  isConnected: (connectionId: string) => ipcRenderer.invoke('db:isConnected', connectionId),
+  getActiveConnections: () => ipcRenderer.invoke('db:getActiveConnections'),
+  getSettings: () => ipcRenderer.invoke('store:getSettings'),
+  updateSettings: (settings: AppSettings) => ipcRenderer.invoke('store:updateSettings', settings),
+  updateAISettings: (aiSettings: AISettings) => ipcRenderer.invoke('store:updateAISettings', aiSettings),
 })
 
 // Type declarations for TypeScript
@@ -172,6 +178,11 @@ declare global {
       getConnections: () => Promise<Connection[]>
       addConnection: (connection: Connection) => Promise<Connection[]>
       deleteConnection: (id: string) => Promise<Connection[]>
+      isConnected: (connectionId: string) => Promise<boolean>
+      getActiveConnections: () => Promise<string[]>
+      getSettings: () => Promise<AppSettings>
+      updateSettings: (settings: AppSettings) => Promise<AppSettings>
+      updateAISettings: (aiSettings: AISettings) => Promise<AISettings>
     }
     windowManager: {
       openConnectionWindow: (connectionId: string, connectionName: string, urlParams?: string) => Promise<{

@@ -118,5 +118,10 @@ electron.contextBridge.exposeInMainWorld("api", {
 electron.contextBridge.exposeInMainWorld("store", {
   getConnections: () => electron.ipcRenderer.invoke("store:getConnections"),
   addConnection: (connection) => electron.ipcRenderer.invoke("store:addConnection", connection),
-  deleteConnection: (id) => electron.ipcRenderer.invoke("store:deleteConnection", id)
+  deleteConnection: (id) => electron.ipcRenderer.invoke("store:deleteConnection", id),
+  isConnected: (connectionId) => electron.ipcRenderer.invoke("db:isConnected", connectionId),
+  getActiveConnections: () => electron.ipcRenderer.invoke("db:getActiveConnections"),
+  getSettings: () => electron.ipcRenderer.invoke("store:getSettings"),
+  updateSettings: (settings) => electron.ipcRenderer.invoke("store:updateSettings", settings),
+  updateAISettings: (aiSettings) => electron.ipcRenderer.invoke("store:updateAISettings", aiSettings)
 });

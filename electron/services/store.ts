@@ -1,5 +1,6 @@
 import Store from 'electron-store';
 import type { Connection } from '../../src/types/connection';
+import type { AppSettings, AISettings } from '../../src/types/settings';
 import DatabaseService from './database.service';
 
 // Define TableSchema interface
@@ -27,6 +28,11 @@ interface TableSchema {
 
 interface StoreSchema {
     connections: Connection[];
+}
+
+// Settings store schema
+interface SettingsSchema {
+    settings: AppSettings;
 }
 
 interface SavedQuery {
@@ -105,6 +111,38 @@ const schemaStore = new Store<SchemaCache>({
     defaults: {
         schemas: {}
     }
+});
+
+// Add settings store
+const settingsStore = new Store<SettingsSchema>({
+    name: 'app-settings',
+    schema: {
+        settings: {
+            type: 'object',
+            properties: {
+                ai: {
+                    type: 'object',
+                    properties: {
+                        openaiApiKey: { type: 'string' },
+                        claudeApiKey: { type: 'string' }
+                    },
+                    required: ['openaiApiKey', 'claudeApiKey']
+                }
+            },
+            required: ['ai']
+        }
+    },
+    defaults: {
+        settings: {
+            ai: {
+                openaiApiKey: '',
+                claudeApiKey: ''
+            }
+        }
+    },
+    // Enable encryption for sensitive data
+    encryptionKey: 'data-deck-secure-settings-key',
+    clearInvalidConfig: true // Clear and reset if the config becomes invalid
 });
 
 // Map to store active database service instances
@@ -495,5 +533,47 @@ export const storeService = {
         await storeService.cacheSchema(connectionId, schemaData);
 
         return schemaData;
+    },
+
+    // Settings methods
+    getSettings: () => {
+        try {
+            const settings = settingsStore.get('settings');
+            return settings || {
+                ai: {
+                    openaiApiKey: '',
+                    claudeApiKey: ''
+                }
+            };
+        } catch (error) {
+            console.error('Error getting settings:', error);
+            // Return default settings if there's an error
+            return {
+                ai: {
+                    openaiApiKey: '',
+                    claudeApiKey: ''
+                }
+            };
+        }
+    },
+
+    updateSettings: (settings: AppSettings) => {
+        try {
+            settingsStore.set('settings', settings);
+            return settingsStore.get('settings');
+        } catch (error) {
+            console.error('Error updating settings:', error);
+            throw error;
+        }
+    },
+
+    updateAISettings: (aiSettings: AISettings) => {
+        try {
+            settingsStore.set('settings.ai', aiSettings);
+            return settingsStore.get('settings.ai');
+        } catch (error) {
+            console.error('Error updating AI settings:', error);
+            throw error;
+        }
     }
 };

@@ -43344,6 +43344,37 @@ const schemaStore = new ElectronStore({
     schemas: {}
   }
 });
+const settingsStore = new ElectronStore({
+  name: "app-settings",
+  schema: {
+    settings: {
+      type: "object",
+      properties: {
+        ai: {
+          type: "object",
+          properties: {
+            openaiApiKey: { type: "string" },
+            claudeApiKey: { type: "string" }
+          },
+          required: ["openaiApiKey", "claudeApiKey"]
+        }
+      },
+      required: ["ai"]
+    }
+  },
+  defaults: {
+    settings: {
+      ai: {
+        openaiApiKey: "",
+        claudeApiKey: ""
+      }
+    }
+  },
+  // Enable encryption for sensitive data
+  encryptionKey: "data-deck-secure-settings-key",
+  clearInvalidConfig: true
+  // Clear and reset if the config becomes invalid
+});
 const activeConnections = /* @__PURE__ */ new Map();
 const storeService = {
   getConnections: () => {
@@ -43622,6 +43653,44 @@ const storeService = {
     const schemaData = await service.getDatabaseSchema();
     await storeService.cacheSchema(connectionId, schemaData);
     return schemaData;
+  },
+  // Settings methods
+  getSettings: () => {
+    try {
+      const settings = settingsStore.get("settings");
+      return settings || {
+        ai: {
+          openaiApiKey: "",
+          claudeApiKey: ""
+        }
+      };
+    } catch (error2) {
+      console.error("Error getting settings:", error2);
+      return {
+        ai: {
+          openaiApiKey: "",
+          claudeApiKey: ""
+        }
+      };
+    }
+  },
+  updateSettings: (settings) => {
+    try {
+      settingsStore.set("settings", settings);
+      return settingsStore.get("settings");
+    } catch (error2) {
+      console.error("Error updating settings:", error2);
+      throw error2;
+    }
+  },
+  updateAISettings: (aiSettings) => {
+    try {
+      settingsStore.set("settings.ai", aiSettings);
+      return settingsStore.get("settings.ai");
+    } catch (error2) {
+      console.error("Error updating AI settings:", error2);
+      throw error2;
+    }
   }
 };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43958,6 +44027,15 @@ ipcMain$1.handle("db:getDatabaseSchema", async (_, connectionId, forceRefresh = 
 });
 ipcMain$1.handle("db:clearSchemaCache", async (_, connectionId) => {
   return await storeService.clearCachedSchema(connectionId);
+});
+ipcMain$1.handle("store:getSettings", () => {
+  return storeService.getSettings();
+});
+ipcMain$1.handle("store:updateSettings", (_, settings) => {
+  return storeService.updateSettings(settings);
+});
+ipcMain$1.handle("store:updateAISettings", (_, aiSettings) => {
+  return storeService.updateAISettings(aiSettings);
 });
 export {
   MAIN_DIST,
