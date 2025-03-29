@@ -65,6 +65,13 @@ interface EditorRefType {
 function QueryPanel({ connectionId, tables = [] }: QueryPanelProps) {
 	const editorRef = useRef<EditorRefType | null>(null);
 
+	// Initialize with width from localStorage or default to 320px
+	const [sidebarWidth, setSidebarWidth] = useState(() => {
+		const savedWidth = localStorage.getItem("querySidebarWidth");
+		return savedWidth ? Number.parseInt(savedWidth, 10) : 320;
+	});
+	const [isResizing, setIsResizing] = useState(false);
+
 	// State for editor
 	const [sql, setSql] = useState<string>("SELECT * FROM ");
 	const [selectedText, setSelectedText] = useState<string>("");
@@ -880,10 +887,57 @@ ${insertStatements.join("\n")}`;
 		);
 	};
 
+	// Handle resize start
+	const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+		setIsResizing(true);
+		mouseDownEvent.preventDefault();
+	}, []);
+
+	// Reset to default width on double click
+	const handleDoubleClick = useCallback(() => {
+		const defaultWidth = 320;
+		setSidebarWidth(defaultWidth);
+	}, []);
+
+	// Handle mouse move during resize
+	useEffect(() => {
+		const handleMouseMove = (mouseMoveEvent: MouseEvent) => {
+			if (isResizing) {
+				const newWidth = mouseMoveEvent.clientX;
+				// Set min and max limits for sidebar width
+				if (newWidth > 200 && newWidth < 600) {
+					setSidebarWidth(newWidth);
+				}
+			}
+		};
+
+		const handleMouseUp = () => {
+			setIsResizing(false);
+		};
+
+		if (isResizing) {
+			document.addEventListener("mousemove", handleMouseMove);
+			document.addEventListener("mouseup", handleMouseUp);
+		}
+
+		return () => {
+			document.removeEventListener("mousemove", handleMouseMove);
+			document.removeEventListener("mouseup", handleMouseUp);
+		};
+	}, [isResizing]);
+
+	// Save sidebar width to localStorage when it changes
+	useEffect(() => {
+		localStorage.setItem("querySidebarWidth", sidebarWidth.toString());
+	}, [sidebarWidth]);
+
 	return (
 		<div className="flex h-full overflow-hidden">
-			{/* Sidebar with tabs for Saved Queries and AI */}
-			<div className="w-80 flex-none border-r border-gray-200 bg-white overflow-auto">
+			{/* Sidebar with dynamic width */}
+			<div
+				className="flex-none border-r border-gray-200 bg-white overflow-auto"
+				style={{ width: `${sidebarWidth}px` }}
+			>
 				<Sidebar
 					connectionId={connectionId}
 					onSelectQuery={(savedSql, queryName) =>
@@ -898,7 +952,21 @@ ${insertStatements.join("\n")}`;
 				/>
 			</div>
 
-			{/* Main Content Area - Reduced padding, just the editor */}
+			{/* Resizer */}
+			<div
+				className="w-1.5 hover:w-2 bg-gray-200 relative cursor-col-resize hover:bg-indigo-400 active:bg-indigo-500 transition-all duration-200 flex items-center justify-center"
+				onMouseDown={startResizing}
+				onDoubleClick={handleDoubleClick}
+			>
+				{/* Resize handle indicator */}
+				<div className="absolute h-8 flex flex-col items-center justify-center">
+					<div className="w-1 h-1 bg-gray-400 rounded-full my-0.5" />
+					<div className="w-1 h-1 bg-gray-400 rounded-full my-0.5" />
+					<div className="w-1 h-1 bg-gray-400 rounded-full my-0.5" />
+				</div>
+			</div>
+
+			{/* Main Content Area */}
 			<div className="flex-1 flex bg-gray-100 overflow-hidden">
 				{/* Content Container with no max-width */}
 				<div className="w-full flex flex-col overflow-hidden bg-white">

@@ -33436,27 +33436,21 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-var hasRequiredField_flags;
-function requireField_flags() {
-  if (hasRequiredField_flags) return field_flags;
-  hasRequiredField_flags = 1;
-  field_flags.NOT_NULL = 1;
-  field_flags.PRI_KEY = 2;
-  field_flags.UNIQUE_KEY = 4;
-  field_flags.MULTIPLE_KEY = 8;
-  field_flags.BLOB = 16;
-  field_flags.UNSIGNED = 32;
-  field_flags.ZEROFILL = 64;
-  field_flags.BINARY = 128;
-  field_flags.ENUM = 256;
-  field_flags.AUTO_INCREMENT = 512;
-  field_flags.TIMESTAMP = 1024;
-  field_flags.SET = 2048;
-  field_flags.NO_DEFAULT_VALUE = 4096;
-  field_flags.ON_UPDATE_NOW = 8192;
-  field_flags.NUM = 32768;
-  return field_flags;
-}
+field_flags.NOT_NULL = 1;
+field_flags.PRI_KEY = 2;
+field_flags.UNIQUE_KEY = 4;
+field_flags.MULTIPLE_KEY = 8;
+field_flags.BLOB = 16;
+field_flags.UNSIGNED = 32;
+field_flags.ZEROFILL = 64;
+field_flags.BINARY = 128;
+field_flags.ENUM = 256;
+field_flags.AUTO_INCREMENT = 512;
+field_flags.TIMESTAMP = 1024;
+field_flags.SET = 2048;
+field_flags.NO_DEFAULT_VALUE = 4096;
+field_flags.ON_UPDATE_NOW = 8192;
+field_flags.NUM = 32768;
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33520,7 +33514,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = requireField_flags();
+    const fiedFlags = field_flags;
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36414,7 +36408,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$7 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = requireField_flags();
+const FieldFlags = field_flags;
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -43756,14 +43750,18 @@ function createConnectionWindow(connectionId) {
       if (win && !win.isDestroyed()) {
         win.focus();
       }
-    }).catch((err) => console.error("Failed to load URL in connection window:", err));
+    }).catch(
+      (err) => console.error("Failed to load URL in connection window:", err)
+    );
   } else {
     connectionWindow.loadFile(path.join(RENDERER_DIST, "index.html")).then(() => {
       connectionWindow.show();
       if (win && !win.isDestroyed()) {
         win.focus();
       }
-    }).catch((err) => console.error("Failed to load file in connection window:", err));
+    }).catch(
+      (err) => console.error("Failed to load file in connection window:", err)
+    );
   }
   connectionWindow.on("closed", () => {
     delete connectionWindows[connectionId];
@@ -43791,7 +43789,10 @@ ipcMain$1.handle("window:focusConnectionWindow", async (_, connectionId) => {
     }
     return false;
   } catch (error2) {
-    console.error(`Failed to focus window for connection ${connectionId}:`, error2);
+    console.error(
+      `Failed to focus window for connection ${connectionId}:`,
+      error2
+    );
     return false;
   }
 });
@@ -43819,7 +43820,10 @@ ipcMain$1.handle("window:getCurrentWindowId", (event) => {
     if (win2) {
       return { success: true, windowId: win2.id };
     }
-    return { success: false, message: "Cannot find window for this webContents" };
+    return {
+      success: false,
+      message: "Cannot find window for this webContents"
+    };
   } catch (error2) {
     console.error("Failed to get current window ID:", error2);
     return {
@@ -43915,7 +43919,12 @@ ipcMain$1.handle("db:getTables", async (_, connectionId) => {
   }
 });
 ipcMain$1.handle("db:getPrimaryKey", async (_, connectionId, tableName) => {
-  console.log("IPC: Getting primary key for table:", tableName, "connection:", connectionId);
+  console.log(
+    "IPC: Getting primary key for table:",
+    tableName,
+    "connection:",
+    connectionId
+  );
   try {
     const result = await storeService.getPrimaryKey(connectionId, tableName);
     console.log("IPC: Got primary keys:", result);
@@ -44022,9 +44031,12 @@ ipcMain$1.handle("delete-query", async (_, args) => {
     };
   }
 });
-ipcMain$1.handle("db:getDatabaseSchema", async (_, connectionId, forceRefresh = false) => {
-  return await storeService.getDatabaseSchema(connectionId, forceRefresh);
-});
+ipcMain$1.handle(
+  "db:getDatabaseSchema",
+  async (_, connectionId, forceRefresh = false) => {
+    return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+  }
+);
 ipcMain$1.handle("db:clearSchemaCache", async (_, connectionId) => {
   return await storeService.clearCachedSchema(connectionId);
 });
@@ -44036,6 +44048,99 @@ ipcMain$1.handle("store:updateSettings", (_, settings) => {
 });
 ipcMain$1.handle("store:updateAISettings", (_, aiSettings) => {
   return storeService.updateAISettings(aiSettings);
+});
+ipcMain$1.handle("ai:generateQuery", async (_, args) => {
+  var _a, _b;
+  try {
+    const { message, model, connectionId } = args;
+    if (!message) {
+      return {
+        success: false,
+        error: "No message provided"
+      };
+    }
+    const settings = storeService.getSettings();
+    let apiKey;
+    if (model === "gpt") {
+      apiKey = (_a = settings == null ? void 0 : settings.ai) == null ? void 0 : _a.openaiApiKey;
+      if (!apiKey) {
+        return {
+          success: false,
+          error: "OpenAI API key not configured"
+        };
+      }
+      console.log(
+        "Would call OpenAI API with message:",
+        message,
+        "for connection:",
+        connectionId
+      );
+      await new Promise((resolve2) => setTimeout(resolve2, 1e3));
+      return {
+        success: true,
+        response: `Here's a SQL query based on your request: 
+
+\`\`\`sql
+SELECT * FROM users
+WHERE created_at > NOW() - INTERVAL 7 DAY
+ORDER BY created_at DESC;
+\`\`\`
+
+This query will fetch all users created in the last 7 days, sorted by creation date.`
+      };
+    }
+    if (model === "claude") {
+      apiKey = (_b = settings == null ? void 0 : settings.ai) == null ? void 0 : _b.claudeApiKey;
+      if (!apiKey) {
+        return {
+          success: false,
+          error: "Claude API key not configured"
+        };
+      }
+      console.log(
+        "Would call Claude API with message:",
+        message,
+        "for connection:",
+        connectionId
+      );
+      await new Promise((resolve2) => setTimeout(resolve2, 1e3));
+      return {
+        success: true,
+        response: `Here's a SQL query based on your request: 
+
+\`\`\`sql
+SELECT * FROM users
+WHERE created_at > NOW() - INTERVAL 7 DAY
+ORDER BY created_at DESC;
+\`\`\`
+
+This query will fetch all users created in the last 7 days, sorted by creation date.`
+      };
+    }
+    return {
+      success: false,
+      error: "Invalid model specified"
+    };
+  } catch (error2) {
+    console.error("Error generating AI query:", error2);
+    return {
+      success: false,
+      error: error2 instanceof Error ? error2.message : "Unknown error generating query"
+    };
+  }
+});
+ipcMain$1.handle("debug:getAISettings", () => {
+  var _a, _b, _c, _d;
+  const settings = storeService.getSettings();
+  return {
+    hasSettings: !!settings,
+    hasAISection: !!(settings == null ? void 0 : settings.ai),
+    openaiKeyPresent: !!((_a = settings == null ? void 0 : settings.ai) == null ? void 0 : _a.openaiApiKey),
+    claudeKeyPresent: !!((_b = settings == null ? void 0 : settings.ai) == null ? void 0 : _b.claudeApiKey),
+    // Add partial key info for verification without exposing full keys
+    openaiKeyPreview: ((_c = settings == null ? void 0 : settings.ai) == null ? void 0 : _c.openaiApiKey) ? `${settings.ai.openaiApiKey.substring(0, 3)}...${settings.ai.openaiApiKey.substring(settings.ai.openaiApiKey.length - 4)}` : null,
+    claudeKeyPreview: ((_d = settings == null ? void 0 : settings.ai) == null ? void 0 : _d.claudeApiKey) ? `${settings.ai.claudeApiKey.substring(0, 3)}...${settings.ai.claudeApiKey.substring(settings.ai.claudeApiKey.length - 4)}` : null
+  };
 });
 export {
   MAIN_DIST,
