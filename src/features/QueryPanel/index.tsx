@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
 	FiPlay,
 	FiSave,
@@ -27,7 +27,7 @@ import {
 } from "../../components/ui/dialog";
 import QueryEditor from "./components/QueryEditor";
 import QueryResults from "./components/QueryResults";
-import SavedQueries from "./components/SavedQueries";
+import Sidebar from "./components/Sidebar";
 import SaveQueryModal from "./components/SaveQueryModal";
 import { IoClose } from "react-icons/io5";
 
@@ -56,8 +56,14 @@ interface QueryResult {
 	isSelect?: boolean;
 }
 
+// Add Editor reference type
+interface EditorRefType {
+	focus: () => void;
+	getSelectedText: () => string;
+}
+
 function QueryPanel({ connectionId, tables = [] }: QueryPanelProps) {
-	const editorRef = useRef<any | null>(null);
+	const editorRef = useRef<EditorRefType | null>(null);
 
 	// State for editor
 	const [sql, setSql] = useState<string>("SELECT * FROM ");
@@ -139,7 +145,7 @@ function QueryPanel({ connectionId, tables = [] }: QueryPanelProps) {
 					);
 
 					// If we have an unsaved query, load it
-					if (unsavedQuery && unsavedQuery.sql) {
+					if (unsavedQuery?.sql) {
 						setSql(unsavedQuery.sql);
 					}
 				}
@@ -332,9 +338,10 @@ function QueryPanel({ connectionId, tables = [] }: QueryPanelProps) {
 
 			try {
 				// Execute this specific query
-				const result = (await window.database.query(connectionId, queryText)) as
-					| DatabaseQueryResult
-					| Record<string, unknown>[];
+				const result = (await window.database.query(
+					connectionId,
+					queryText,
+				)) as unknown as DatabaseQueryResult | Record<string, unknown>[];
 				const executionTime = stopTimer();
 
 				// Update results with success
@@ -875,9 +882,9 @@ ${insertStatements.join("\n")}`;
 
 	return (
 		<div className="flex h-full overflow-hidden">
-			{/* Saved Queries Sidebar - Wider width */}
-			<div className="w-80 flex-none border-r border-gray-200 bg-white overflow-auto saved-queries-component">
-				<SavedQueries
+			{/* Sidebar with tabs for Saved Queries and AI */}
+			<div className="w-80 flex-none border-r border-gray-200 bg-white overflow-auto">
+				<Sidebar
 					connectionId={connectionId}
 					onSelectQuery={(savedSql, queryName) =>
 						loadQuery(savedSql, queryName)
