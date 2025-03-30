@@ -114,7 +114,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 	};
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full w-full">
 			<Tabs
 				defaultValue="tables"
 				value={currentActiveTab}
@@ -146,10 +146,10 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="tables"
-					className="flex-1 flex h-full mt-0 border-none p-0"
+					className="flex h-full mt-0 border-none p-0"
 				>
 					<div
-						className="flex flex-1 flex-row h-full"
+						className="flex flex-1 flex-row h-screen"
 						id="main-tables-container"
 					>
 						<TableList
@@ -163,7 +163,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 						/>
 
 						{/* Main Content */}
-						<div className="flex-1 flex flex-col overflow-hidden bg-background">
+						<div className="flex flex-col overflow-hidden bg-background">
 							{loading && (
 								<div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md dark:bg-blue-900/20 dark:border-blue-800/30 dark:text-blue-400">
 									Loading tables...
@@ -197,9 +197,9 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							{/* Table Content */}
 							<div className="flex-1 overflow-hidden">
 								{activeTable ? (
-									<div className="h-full flex flex-col">
+									<div className="flex-1 h-full flex flex-col">
 										{/* Data Table */}
-										<div className="flex-1 overflow-auto">
+										<div className="overflow-auto">
 											<DataTable
 												tableName={activeTable}
 												connectionId={connectionId}
