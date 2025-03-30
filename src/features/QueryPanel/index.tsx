@@ -742,11 +742,11 @@ ${insertStatements.join("\n")}`;
 											{displayQuery}
 										</span>
 
-										{result.executionTime && (
+										{result.executionTime ? (
 											<span className="text-xs text-muted-foreground font-mono ml-2">
 												{formatExecutionTime(result.executionTime)}
 											</span>
-										)}
+										) : null}
 									</div>
 
 									<Button
