@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('database', {
         console.log("[Preload] getPrimaryKey with ID:", connectionId, "table:", tableName);
         return ipcRenderer.invoke('db:getPrimaryKey', connectionId, tableName);
     },
+    getTableStructure: (connectionId, tableName) => {
+        console.log("[Preload] getTableStructure with ID:", connectionId, "table:", tableName);
+        return ipcRenderer.invoke('db:getTableStructure', connectionId, tableName);
+    },
     updateCell: (connectionId, tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue) => {
         console.log("[Preload] updateCell with ID:", connectionId);
         return ipcRenderer.invoke('db:updateCell', connectionId, tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue);

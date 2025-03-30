@@ -33436,27 +33436,21 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-var hasRequiredField_flags;
-function requireField_flags() {
-  if (hasRequiredField_flags) return field_flags;
-  hasRequiredField_flags = 1;
-  field_flags.NOT_NULL = 1;
-  field_flags.PRI_KEY = 2;
-  field_flags.UNIQUE_KEY = 4;
-  field_flags.MULTIPLE_KEY = 8;
-  field_flags.BLOB = 16;
-  field_flags.UNSIGNED = 32;
-  field_flags.ZEROFILL = 64;
-  field_flags.BINARY = 128;
-  field_flags.ENUM = 256;
-  field_flags.AUTO_INCREMENT = 512;
-  field_flags.TIMESTAMP = 1024;
-  field_flags.SET = 2048;
-  field_flags.NO_DEFAULT_VALUE = 4096;
-  field_flags.ON_UPDATE_NOW = 8192;
-  field_flags.NUM = 32768;
-  return field_flags;
-}
+field_flags.NOT_NULL = 1;
+field_flags.PRI_KEY = 2;
+field_flags.UNIQUE_KEY = 4;
+field_flags.MULTIPLE_KEY = 8;
+field_flags.BLOB = 16;
+field_flags.UNSIGNED = 32;
+field_flags.ZEROFILL = 64;
+field_flags.BINARY = 128;
+field_flags.ENUM = 256;
+field_flags.AUTO_INCREMENT = 512;
+field_flags.TIMESTAMP = 1024;
+field_flags.SET = 2048;
+field_flags.NO_DEFAULT_VALUE = 4096;
+field_flags.ON_UPDATE_NOW = 8192;
+field_flags.NUM = 32768;
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33520,7 +33514,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = requireField_flags();
+    const fiedFlags = field_flags;
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36414,7 +36408,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$7 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = requireField_flags();
+const FieldFlags = field_flags;
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -40725,7 +40719,9 @@ class MySQLService {
                  AND CONSTRAINT_NAME = 'PRIMARY'`,
         [tableName]
       );
-      const primaryKeys = rows.map((row) => row.COLUMN_NAME);
+      const primaryKeys = rows.map(
+        (row) => row.COLUMN_NAME
+      );
       console.log("MySQL primary keys found:", primaryKeys);
       return primaryKeys;
     } catch (error2) {
@@ -40772,7 +40768,8 @@ class MySQLService {
       const result = [];
       for (const table of tables) {
         const tableName = table.TABLE_NAME;
-        const [columns] = await this.connection.execute(`
+        const [columns] = await this.connection.execute(
+          `
                     SELECT 
                         COLUMN_NAME, 
                         DATA_TYPE,
@@ -40784,8 +40781,11 @@ class MySQLService {
                     FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE() 
                     AND TABLE_NAME = ?
-                `, [tableName]);
-        const [foreignKeys] = await this.connection.execute(`
+                `,
+          [tableName]
+        );
+        const [foreignKeys] = await this.connection.execute(
+          `
                     SELECT
                         COLUMN_NAME,
                         REFERENCED_TABLE_NAME,
@@ -40794,7 +40794,9 @@ class MySQLService {
                     WHERE TABLE_SCHEMA = DATABASE() 
                     AND TABLE_NAME = ?
                     AND REFERENCED_TABLE_NAME IS NOT NULL
-                `, [tableName]);
+                `,
+          [tableName]
+        );
         const tableInfo = {
           name: tableName,
           columns: columns.map((col) => ({
@@ -40817,6 +40819,45 @@ class MySQLService {
       return result;
     } catch (error2) {
       console.error("Error extracting MySQL database schema:", error2);
+      throw error2;
+    }
+  }
+  async getTableStructure(tableName) {
+    if (!this.connection) {
+      throw new Error("No MySQL connection");
+    }
+    try {
+      const [columns] = await this.connection.execute(
+        `
+                SELECT 
+                    COLUMN_NAME, 
+                    DATA_TYPE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = ?
+                ORDER BY ORDINAL_POSITION
+            `,
+        [tableName]
+      );
+      return columns.map(
+        (col) => {
+          const dataType2 = col.DATA_TYPE.toLowerCase();
+          let type2 = "string";
+          if (dataType2 === "json" || dataType2.includes("blob")) {
+            type2 = "json";
+          } else if (dataType2.includes("int") || dataType2 === "decimal" || dataType2 === "float" || dataType2 === "double" || dataType2 === "real") {
+            type2 = "number";
+          } else if (dataType2 === "tinyint(1)" || dataType2 === "boolean" || dataType2 === "bool") {
+            type2 = "boolean";
+          }
+          return {
+            column: col.COLUMN_NAME,
+            type: type2
+          };
+        }
+      );
+    } catch (error2) {
+      console.error("Error getting MySQL table structure:", error2);
       throw error2;
     }
   }
@@ -42913,25 +42954,33 @@ class PostgresService {
         throw new Error("No PostgreSQL connection");
       }
       let modifiedSql = sql;
-      modifiedSql = sql.replace(/\b(FROM|JOIN|UPDATE|INTO|TABLE)\s+([A-Za-z0-9_.]+)(?!\s*\()/gi, (match, clause, identifier) => {
-        if (identifier.startsWith('"') && identifier.endsWith('"')) {
-          return `${clause} ${identifier}`;
+      modifiedSql = sql.replace(
+        /\b(FROM|JOIN|UPDATE|INTO|TABLE)\s+([A-Za-z0-9_.]+)(?!\s*\()/gi,
+        (match, clause, identifier) => {
+          if (identifier.startsWith('"') && identifier.endsWith('"')) {
+            return `${clause} ${identifier}`;
+          }
+          return `${clause} "${identifier}"`;
         }
-        return `${clause} "${identifier}"`;
-      });
-      modifiedSql = modifiedSql.replace(/\b(ORDER BY|GROUP BY)\s+([A-Za-z0-9_.]+)/gi, (match, clause, identifier) => {
-        if (identifier.startsWith('"') && identifier.endsWith('"')) {
-          return `${clause} ${identifier}`;
+      );
+      modifiedSql = modifiedSql.replace(
+        /\b(ORDER BY|GROUP BY)\s+([A-Za-z0-9_.]+)/gi,
+        (match, clause, identifier) => {
+          if (identifier.startsWith('"') && identifier.endsWith('"')) {
+            return `${clause} ${identifier}`;
+          }
+          return `${clause} "${identifier}"`;
         }
-        return `${clause} "${identifier}"`;
-      });
+      );
       try {
         const rows = await this.pgClient.unsafe(modifiedSql);
         return rows;
       } catch (pgError) {
         if (pgError instanceof Error && ((_a = pgError.message) == null ? void 0 : _a.includes("relation")) && ((_b = pgError.message) == null ? void 0 : _b.includes("does not exist"))) {
           const tableName = ((_c = pgError.message.match(/relation "([^"]+)" does not exist/)) == null ? void 0 : _c[1]) || "unknown";
-          throw new Error(`Table "${tableName}" does not exist in the database. Please check the table name and ensure it exists.`);
+          throw new Error(
+            `Table "${tableName}" does not exist in the database. Please check the table name and ensure it exists.`
+          );
         }
         throw pgError;
       }
@@ -42991,7 +43040,10 @@ class PostgresService {
       return [];
     }
     try {
-      console.log("Executing PostgreSQL primary key query for table:", tableName);
+      console.log(
+        "Executing PostgreSQL primary key query for table:",
+        tableName
+      );
       const correctTableName = await this.getCorrectTableNameForPostgres(tableName);
       console.log("Correct table name from PostgreSQL:", correctTableName);
       if (!correctTableName) {
@@ -43000,7 +43052,10 @@ class PostgresService {
                     SELECT table_name FROM information_schema.tables 
                     WHERE table_schema = 'public'
                 `;
-        console.log("Available tables in public schema:", allTables.map((t2) => t2.table_name));
+        console.log(
+          "Available tables in public schema:",
+          allTables.map((t2) => t2.table_name)
+        );
         return [];
       }
       const tableNameForQueries = correctTableName.toLowerCase();
@@ -43022,7 +43077,9 @@ class PostgresService {
         console.log("Primary keys from pg_index query:", result);
         return result;
       }
-      console.log(`No primary keys found for table ${tableName} using pg_index method`);
+      console.log(
+        `No primary keys found for table ${tableName} using pg_index method`
+      );
       return [];
     } catch (error2) {
       console.error("Error getting PostgreSQL primary key:", error2);
@@ -43178,6 +43235,46 @@ class PostgresService {
       throw error2;
     }
   }
+  async getTableStructure(tableName) {
+    if (!this.pgClient) {
+      throw new Error("No PostgreSQL connection");
+    }
+    try {
+      const correctTableName = await this.getCorrectTableNameForPostgres(tableName);
+      if (!correctTableName) {
+        throw new Error(`Table ${tableName} not found in PostgreSQL database`);
+      }
+      const columns = await this.pgClient`
+                SELECT 
+                    column_name, 
+                    data_type,
+                    udt_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND table_name = ${correctTableName}
+                ORDER BY ordinal_position
+            `;
+      return columns.map((col) => {
+        const dataType2 = col.data_type.toLowerCase();
+        const udtName = col.udt_name.toLowerCase();
+        let type2 = "string";
+        if (dataType2 === "json" || dataType2 === "jsonb" || dataType2.includes("bytea")) {
+          type2 = "json";
+        } else if (dataType2.includes("int") || dataType2 === "numeric" || dataType2 === "decimal" || dataType2 === "real" || dataType2 === "double precision" || udtName === "float4" || udtName === "float8") {
+          type2 = "number";
+        } else if (dataType2 === "boolean" || udtName === "bool") {
+          type2 = "boolean";
+        }
+        return {
+          column: col.column_name,
+          type: type2
+        };
+      });
+    } catch (error2) {
+      console.error("Error getting PostgreSQL table structure:", error2);
+      throw error2;
+    }
+  }
 }
 class DatabaseService {
   constructor(dbType) {
@@ -43194,7 +43291,10 @@ class DatabaseService {
   async connect(config) {
     try {
       await this.disconnect();
-      let result = { success: false, message: "Invalid database type" };
+      let result = {
+        success: false,
+        message: "Invalid database type"
+      };
       result = await this.service.connect({
         host: config.host,
         port: config.port,
@@ -43295,6 +43395,13 @@ class DatabaseService {
     }
     return await this.service.getDatabaseSchema();
   }
+  // Get table structure (column names and types)
+  async getTableStructure(tableName) {
+    if (!this.dbType) {
+      throw new Error("No database connection");
+    }
+    return await this.service.getTableStructure(tableName);
+  }
 }
 const store = new ElectronStore({
   defaults: {
@@ -43393,7 +43500,10 @@ const storeService = {
       activeConnections.delete(id2);
     }
     const connections = store.get("connections");
-    store.set("connections", connections.filter((conn) => conn.id !== id2));
+    store.set(
+      "connections",
+      connections.filter((conn) => conn.id !== id2)
+    );
     const schemas = schemaStore.get("schemas");
     if (schemas[id2]) {
       delete schemas[id2];
@@ -43461,7 +43571,9 @@ const storeService = {
     }
     const service = activeConnections.get(connectionId);
     if (!service) {
-      throw new Error(`Database service not found for connection: ${connectionId}`);
+      throw new Error(
+        `Database service not found for connection: ${connectionId}`
+      );
     }
     console.log("Service found, executing getTables");
     return await service.getTables();
@@ -43475,16 +43587,17 @@ const storeService = {
   },
   async getPrimaryKey(connectionId, tableName) {
     const service = activeConnections.get(connectionId);
-    if (!service) {
-      throw new Error(`No active connection for ID: ${connectionId}`);
-    }
+    if (!service) throw new Error("No active connection with this ID");
     return await service.getPrimaryKey(tableName);
+  },
+  async getTableStructure(connectionId, tableName) {
+    const service = activeConnections.get(connectionId);
+    if (!service) throw new Error("No active connection with this ID");
+    return await service.getTableStructure(tableName);
   },
   async updateCell(connectionId, tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue) {
     const service = activeConnections.get(connectionId);
-    if (!service) {
-      throw new Error(`No active connection for ID: ${connectionId}`);
-    }
+    if (!service) throw new Error("No active connection with this ID");
     return await service.updateCell(
       tableName,
       primaryKeyColumn,
@@ -43508,7 +43621,10 @@ const storeService = {
       throw new Error("Missing connection ID, name, or SQL query");
     }
     try {
-      const connectionQueries = queryStore.get(`queries.${connectionId}`, {});
+      const connectionQueries = queryStore.get(
+        `queries.${connectionId}`,
+        {}
+      );
       connectionQueries[name] = {
         name,
         sql,
@@ -43527,7 +43643,10 @@ const storeService = {
       throw new Error("Missing connection ID");
     }
     try {
-      const connectionQueries = queryStore.get(`queries.${connectionId}`, {});
+      const connectionQueries = queryStore.get(
+        `queries.${connectionId}`,
+        {}
+      );
       const queriesArray = Object.values(connectionQueries);
       if (!queriesArray.some((q) => q.name === "Unsaved Query")) {
         connectionQueries["Unsaved Query"] = {
@@ -43554,7 +43673,10 @@ const storeService = {
       throw new Error("Missing connection ID or query name");
     }
     try {
-      const connectionQueries = queryStore.get(`queries.${connectionId}`, {});
+      const connectionQueries = queryStore.get(
+        `queries.${connectionId}`,
+        {}
+      );
       delete connectionQueries[name];
       queryStore.set(`queries.${connectionId}`, connectionQueries);
       return { success: true };
@@ -43921,6 +44043,25 @@ ipcMain$1.handle("db:getTables", async (_, connectionId) => {
     return await storeService.getTables(connectionId);
   } catch (error2) {
     console.error("Main process: error getting tables:", error2);
+    throw error2;
+  }
+});
+ipcMain$1.handle("db:getTableStructure", async (_, connectionId, tableName) => {
+  console.log(
+    "IPC: Getting table structure for table:",
+    tableName,
+    "connection:",
+    connectionId
+  );
+  try {
+    const result = await storeService.getTableStructure(
+      connectionId,
+      tableName
+    );
+    console.log("IPC: Got table structure:", result);
+    return result;
+  } catch (error2) {
+    console.error("IPC: Error getting table structure:", error2);
     throw error2;
   }
 });

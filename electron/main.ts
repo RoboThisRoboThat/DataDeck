@@ -329,6 +329,26 @@ ipcMain.handle("db:getTables", async (_, connectionId) => {
 	}
 });
 
+ipcMain.handle("db:getTableStructure", async (_, connectionId, tableName) => {
+	console.log(
+		"IPC: Getting table structure for table:",
+		tableName,
+		"connection:",
+		connectionId,
+	);
+	try {
+		const result = await storeService.getTableStructure(
+			connectionId,
+			tableName,
+		);
+		console.log("IPC: Got table structure:", result);
+		return result;
+	} catch (error) {
+		console.error("IPC: Error getting table structure:", error);
+		throw error;
+	}
+});
+
 ipcMain.handle("db:getPrimaryKey", async (_, connectionId, tableName) => {
 	console.log(
 		"IPC: Getting primary key for table:",

@@ -34,6 +34,7 @@ import {
 	setActiveTable,
 	fetchPrimaryKeys,
 	setEditingCell,
+	fetchTableStructure,
 } from "../../../store/slices/tablesSlice";
 import { cn } from "@/lib/utils";
 
@@ -145,6 +146,13 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		);
 		dispatch(
 			fetchPrimaryKeys({
+				tableName,
+				connectionId,
+			}),
+		);
+		// Also fetch table structure
+		dispatch(
+			fetchTableStructure({
 				tableName,
 				connectionId,
 			}),
@@ -793,22 +801,26 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				{/* Pagination Controls */}
 				<div className="flex items-center justify-between mb-3">
 					<div className="flex items-center">
-						<h2 className="text-lg font-semibold text-gray-800 mr-3">
-							{tableName}
-						</h2>
-						<Button
-							variant="outline"
-							size="sm"
-							className="flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
-							onClick={openGlobalFilterModal}
-						>
-							<FiFilter size={14} />
-							<span>Filter</span>
-						</Button>
-						<div className="ml-2 text-xs text-gray-500">(⌘F or Ctrl+F)</div>
+						<h2 className="text-lg font-semibold text-gray-800">{tableName}</h2>
 					</div>
 
 					<div className="flex items-center space-x-6">
+						{/* Filter button */}
+						<div className="flex items-center">
+							<Button
+								variant="outline"
+								size="sm"
+								className="flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+								onClick={openGlobalFilterModal}
+							>
+								<FiFilter size={14} />
+								<span>Filter</span>
+								<span className="ml-1 text-xs text-gray-500 opacity-75">
+									⌘+F
+								</span>
+							</Button>
+						</div>
+
 						{/* Rows per page selector */}
 						<div className="flex items-center space-x-2">
 							<span className="text-sm text-gray-600">Rows per page:</span>
