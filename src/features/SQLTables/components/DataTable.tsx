@@ -91,6 +91,30 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	// Track previous values to detect changes
 	const prevTableNameRef = useRef(tableName);
 
+	// Add keyboard shortcut event listener
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Check for Cmd+F (Mac) or Ctrl+F (Windows)
+			if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+				e.preventDefault(); // Prevent browser's default find behavior
+
+				// Only open the modal if it's not already open
+				if (!filterModalOpen) {
+					openGlobalFilterModal();
+				}
+			}
+		};
+
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [filterModalOpen]); // Add filterModalOpen as a dependency
+
+	// Function to open filter modal without pre-selecting a column
+	const openGlobalFilterModal = () => {
+		setFilterColumn(""); // Clear any pre-selected column
+		setFilterModalOpen(true);
+	};
+
 	// Set active table when component mounts
 	useEffect(() => {
 		dispatch(setActiveTable(tableName));
@@ -768,7 +792,21 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			<div className="p-4 border-b border-gray-200">
 				{/* Pagination Controls */}
 				<div className="flex items-center justify-between mb-3">
-					<h2 className="text-lg font-semibold text-gray-800">{tableName}</h2>
+					<div className="flex items-center">
+						<h2 className="text-lg font-semibold text-gray-800 mr-3">
+							{tableName}
+						</h2>
+						<Button
+							variant="outline"
+							size="sm"
+							className="flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+							onClick={openGlobalFilterModal}
+						>
+							<FiFilter size={14} />
+							<span>Filter</span>
+						</Button>
+						<div className="ml-2 text-xs text-gray-500">(⌘F or Ctrl+F)</div>
+					</div>
 
 					<div className="flex items-center space-x-6">
 						{/* Rows per page selector */}
@@ -905,7 +943,8 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			<FilterModal
 				open={filterModalOpen}
 				onClose={() => setFilterModalOpen(false)}
-				column={filterColumn}
+				columns={columns}
+				selectedColumn={filterColumn}
 				currentFilter={filters[filterColumn]}
 				onApply={handleFilterApply}
 			/>
