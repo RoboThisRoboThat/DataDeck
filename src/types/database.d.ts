@@ -75,7 +75,7 @@ interface Database {
 	getDatabaseSchema: (
 		connectionId: string,
 		forceRefresh?: boolean,
-	) => Promise<TableSchema[]>;
+	) => Promise<{ data: TableSchema[]; dbType: string }>;
 	clearSchemaCache: (connectionId: string) => Promise<{ success: boolean }>;
 }
 

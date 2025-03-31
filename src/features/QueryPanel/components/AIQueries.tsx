@@ -1,11 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import {
-	FiSend,
-	FiAlertCircle,
-	FiArrowRight,
-	FiDatabase,
-	FiRefreshCw,
-} from "react-icons/fi";
+import { FiSend, FiAlertCircle, FiArrowRight } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,6 +81,7 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 	const [error, setError] = useState<string | null>(null);
 	const [tableSchemas, setTableSchemas] = useState<TableSchema[]>([]);
 	const [loadingSchema, setLoadingSchema] = useState(true);
+	const [databaseType, setDatabaseType] = useState<string>("unknown");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const { settings, isLoading: settingsLoading } = useSettings();
@@ -101,7 +96,8 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 	useEffect(() => {
 		const fetchSchema = async () => {
 			try {
-				const schema = await window.database.getDatabaseSchema(connectionId);
+				const { data: schema, dbType } =
+					await window.database.getDatabaseSchema(connectionId);
 				// Map the schema from the database to match our component's expected interface
 				const mappedSchema = schema.map((table) => ({
 					name: table.name,
@@ -113,6 +109,8 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 					foreignKeys: table.foreignKeys || [], // Add the required foreignKeys property
 				}));
 				setTableSchemas(mappedSchema);
+				setDatabaseType(dbType);
+
 				setLoadingSchema(false);
 			} catch (error) {
 				console.error("Error fetching schema:", error);
@@ -187,7 +185,7 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 		if (!tableSchemas || tableSchemas.length === 0)
 			return "No database schema available.";
 
-		let formattedSchema = "DATABASE SCHEMA:\n";
+		let formattedSchema = `DATABASE TYPE: ${databaseType.toUpperCase()}\n\nDATABASE SCHEMA:\n`;
 
 		for (const table of tableSchemas) {
 			formattedSchema += `\nTABLE: ${table.name}\n`;
@@ -211,6 +209,7 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 	};
 
 	const sendMessage = async () => {
+		console.log("database schema:=========>", tableSchemas);
 		if (!inputValue.trim()) return;
 
 		// Check if we have the appropriate API key
@@ -330,12 +329,13 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 					?.name || "products"
 			: "products";
 
+		// Check for specific query patterns and provide appropriate responses
 		if (
 			query.toLowerCase().includes("user") &&
 			query.toLowerCase().includes("last week")
 		) {
 			sqlQuery = `
-Based on your database schema, here's a SQL query to find users who signed up in the last week:
+Based on your ${databaseType.toUpperCase()} database schema, here's a SQL query to find users who signed up in the last week:
 
 \`\`\`sql
 SELECT 
@@ -343,7 +343,18 @@ SELECT
 FROM 
   ${userTableName}
 WHERE 
-  created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+  ${
+		databaseType.toLowerCase() === "mysql" ||
+		databaseType.toLowerCase() === "mariadb"
+			? "created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)"
+			: databaseType.toLowerCase() === "postgresql"
+				? "created_at >= CURRENT_DATE - INTERVAL '7 days'"
+				: databaseType.toLowerCase() === "sqlite"
+					? "created_at >= date('now', '-7 days')"
+					: databaseType.toLowerCase() === "mssql"
+						? "created_at >= DATEADD(day, -7, GETDATE())"
+						: "created_at >= (CURRENT_DATE - 7)"
+	}
 ORDER BY 
   created_at DESC;
 \`\`\`
@@ -354,7 +365,7 @@ This query selects user information for all users where the creation date is wit
 			query.toLowerCase().includes("greater than")
 		) {
 			sqlQuery = `
-Based on your database schema, here's a SQL query to find orders with a total value greater than $100:
+Based on your ${databaseType.toUpperCase()} database schema, here's a SQL query to find orders with a total value greater than $100:
 
 \`\`\`sql
 SELECT 
@@ -373,26 +384,98 @@ This query finds all orders with a total amount greater than $100, ordered by th
 			query.toLowerCase().includes("product")
 		) {
 			sqlQuery = `
-Based on your database schema, here's a SQL query to get the top 10 products:
+Based on your ${databaseType.toUpperCase()} database schema, here's a SQL query to get the top 10 products:
 
 \`\`\`sql
-SELECT 
+${
+	databaseType.toLowerCase() === "mssql"
+		? `SELECT TOP 10
+  *
+FROM 
+  ${productTableName}
+ORDER BY 
+  popularity DESC;`
+		: `SELECT 
   *
 FROM 
   ${productTableName}
 ORDER BY 
   popularity DESC
-LIMIT 10;
+LIMIT 10;`
+}
 \`\`\`
 
 This query returns the top 10 products ordered by popularity.`;
+		} else if (
+			query.toLowerCase().includes("all") &&
+			query.toLowerCase().includes("tables")
+		) {
+			// Special case for listing all tables
+			if (hasSchema) {
+				const tableList = tableSchemas.map((t) => t.name).join(", ");
+
+				sqlQuery = `
+Based on your ${databaseType.toUpperCase()} database schema, here are all the tables in your database:
+
+${tableSchemas.map((t) => `- ${t.name}`).join("\n")}
+
+If you want to see this information using SQL, you can use the following query:
+
+\`\`\`sql
+${
+	databaseType.toLowerCase() === "mysql" ||
+	databaseType.toLowerCase() === "mariadb"
+		? "SHOW TABLES;"
+		: databaseType.toLowerCase() === "postgresql"
+			? "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+			: databaseType.toLowerCase() === "sqlite"
+				? "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+				: databaseType.toLowerCase() === "mssql"
+					? "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';"
+					: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+}
+\`\`\`
+
+This query will list all user-created tables in your ${databaseType.toUpperCase()} database.`;
+			} else {
+				sqlQuery = `
+I don't have detailed information about your ${databaseType.toUpperCase()} database schema. To list all tables in your database, you can use this query:
+
+\`\`\`sql
+${
+	databaseType.toLowerCase() === "mysql" ||
+	databaseType.toLowerCase() === "mariadb"
+		? "SHOW TABLES;"
+		: databaseType.toLowerCase() === "postgresql"
+			? "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+			: databaseType.toLowerCase() === "sqlite"
+				? "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+				: databaseType.toLowerCase() === "mssql"
+					? "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';"
+					: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+}
+\`\`\``;
+			}
 		} else {
-			sqlQuery = `
-I've analyzed your database schema and can help you create a SQL query based on your request. Here's a general outline of your schema:
+			// Default response for other queries
+			if (hasSchema) {
+				// Provide a more helpful response with table information
+				const tableList = tableSchemas.map((t) => `- ${t.name}`).join("\n");
+
+				sqlQuery = `
+I've analyzed your ${databaseType.toUpperCase()} database schema. Here are the tables in your database:
+
+${tableList}
+
+Please provide more details about what specific data you're looking for, and I'll generate a targeted SQL query for your ${databaseType.toUpperCase()} database.`;
+			} else {
+				sqlQuery = `
+I've analyzed your ${databaseType.toUpperCase()} database schema and can help you create a SQL query based on your request. Here's a general outline of your schema:
 
 ${schemaContext.length > 300 ? `${schemaContext.substring(0, 300)}...\n(schema truncated for readability)` : schemaContext}
 
-Please provide more details about what specific data you're looking for, and I'll generate a targeted SQL query for your database structure.`;
+Please provide more details about what specific data you're looking for, and I'll generate a targeted SQL query for your ${databaseType.toUpperCase()} database.`;
+			}
 		}
 
 		return sqlQuery;
@@ -493,8 +576,9 @@ Please provide more details about what specific data you're looking for, and I'l
 					<div className="flex flex-col items-center justify-center h-full text-center">
 						<p className="text-gray-600 mb-1 font-medium">AI Query Assistant</p>
 						<p className="text-gray-500 max-w-xs mb-6">
-							I can help you write SQL queries for your database. Just describe
-							what you need!
+							I can help you write SQL queries for your{" "}
+							{databaseType.toUpperCase()} database. Just describe what you
+							need!
 						</p>
 
 						<div className="flex flex-col gap-2 w-full max-w-md">
@@ -530,6 +614,16 @@ Please provide more details about what specific data you're looking for, and I'l
 								}
 							>
 								Get top 10 products by quantity sold
+								<FiArrowRight />
+							</Button>
+							<Button
+								variant="outline"
+								className="justify-between py-6"
+								onClick={() =>
+									setInputValue("Tell me all the tables that I have in my db")
+								}
+							>
+								Tell me all the tables that I have in my db
 								<FiArrowRight />
 							</Button>
 						</div>

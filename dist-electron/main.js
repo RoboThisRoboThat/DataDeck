@@ -14926,18 +14926,18 @@ class Conf {
     const fileExtension = options.fileExtension ? `.${options.fileExtension}` : "";
     this.path = path.resolve(options.cwd, `${options.configName ?? "config"}${fileExtension}`);
     const fileStore = this.store;
-    const store2 = Object.assign(createPlainObject(), options.defaults, fileStore);
+    const store = Object.assign(createPlainObject(), options.defaults, fileStore);
     if (options.migrations) {
       if (!options.projectVersion) {
         throw new Error("Please specify the `projectVersion` option.");
       }
       this._migrate(options.migrations, options.projectVersion, options.beforeEachMigration);
     }
-    this._validate(store2);
+    this._validate(store);
     try {
-      assert.deepEqual(fileStore, store2);
+      assert.deepEqual(fileStore, store);
     } catch {
-      this.store = store2;
+      this.store = store;
     }
     if (options.watch) {
       this._watch();
@@ -14947,8 +14947,8 @@ class Conf {
     if (__privateGet(this, _options).accessPropertiesByDotNotation) {
       return this._get(key2, defaultValue);
     }
-    const { store: store2 } = this;
-    return key2 in store2 ? store2[key2] : defaultValue;
+    const { store } = this;
+    return key2 in store ? store[key2] : defaultValue;
   }
   set(key2, value) {
     if (typeof key2 !== "string" && typeof key2 !== "object") {
@@ -14960,13 +14960,13 @@ class Conf {
     if (this._containsReservedKey(key2)) {
       throw new TypeError(`Please don't use the ${INTERNAL_KEY} key, as it's used to manage this module internal operations.`);
     }
-    const { store: store2 } = this;
+    const { store } = this;
     const set = (key22, value2) => {
       checkValueType(key22, value2);
       if (__privateGet(this, _options).accessPropertiesByDotNotation) {
-        setProperty(store2, key22, value2);
+        setProperty(store, key22, value2);
       } else {
-        store2[key22] = value2;
+        store[key22] = value2;
       }
     };
     if (typeof key2 === "object") {
@@ -14977,7 +14977,7 @@ class Conf {
     } else {
       set(key2, value);
     }
-    this.store = store2;
+    this.store = store;
   }
   /**
       Check if an item exists.
@@ -15005,13 +15005,13 @@ class Conf {
     }
   }
   delete(key2) {
-    const { store: store2 } = this;
+    const { store } = this;
     if (__privateGet(this, _options).accessPropertiesByDotNotation) {
-      deleteProperty(store2, key2);
+      deleteProperty(store, key2);
     } else {
-      delete store2[key2];
+      delete store[key2];
     }
-    this.store = store2;
+    this.store = store;
   }
   /**
       Delete all items.
@@ -15234,9 +15234,9 @@ class Conf {
     return getProperty(this.store, key2, defaultValue);
   }
   _set(key2, value) {
-    const { store: store2 } = this;
-    setProperty(store2, key2, value);
-    this.store = store2;
+    const { store } = this;
+    setProperty(store, key2, value);
+    this.store = store;
   }
 }
 _validator = new WeakMap();
@@ -33436,21 +33436,27 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-field_flags.NOT_NULL = 1;
-field_flags.PRI_KEY = 2;
-field_flags.UNIQUE_KEY = 4;
-field_flags.MULTIPLE_KEY = 8;
-field_flags.BLOB = 16;
-field_flags.UNSIGNED = 32;
-field_flags.ZEROFILL = 64;
-field_flags.BINARY = 128;
-field_flags.ENUM = 256;
-field_flags.AUTO_INCREMENT = 512;
-field_flags.TIMESTAMP = 1024;
-field_flags.SET = 2048;
-field_flags.NO_DEFAULT_VALUE = 4096;
-field_flags.ON_UPDATE_NOW = 8192;
-field_flags.NUM = 32768;
+var hasRequiredField_flags;
+function requireField_flags() {
+  if (hasRequiredField_flags) return field_flags;
+  hasRequiredField_flags = 1;
+  field_flags.NOT_NULL = 1;
+  field_flags.PRI_KEY = 2;
+  field_flags.UNIQUE_KEY = 4;
+  field_flags.MULTIPLE_KEY = 8;
+  field_flags.BLOB = 16;
+  field_flags.UNSIGNED = 32;
+  field_flags.ZEROFILL = 64;
+  field_flags.BINARY = 128;
+  field_flags.ENUM = 256;
+  field_flags.AUTO_INCREMENT = 512;
+  field_flags.TIMESTAMP = 1024;
+  field_flags.SET = 2048;
+  field_flags.NO_DEFAULT_VALUE = 4096;
+  field_flags.ON_UPDATE_NOW = 8192;
+  field_flags.NUM = 32768;
+  return field_flags;
+}
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33514,7 +33520,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = field_flags;
+    const fiedFlags = requireField_flags();
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36408,7 +36414,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$7 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = field_flags;
+const FieldFlags = requireField_flags();
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -43302,9 +43308,8 @@ class DatabaseService {
         password: config.password,
         database: config.database
       });
-      if (result.success) {
-        this.dbType = config.dbType;
-      }
+      this.dbType = config.dbType;
+      console.log("Print the database type here=====>", this.dbType);
       return result;
     } catch (error2) {
       console.error("Error in connect method:", error2);
@@ -43403,7 +43408,7 @@ class DatabaseService {
     return await this.service.getTableStructure(tableName);
   }
 }
-const store = new ElectronStore({
+const connectionStore = new ElectronStore({
   defaults: {
     connections: []
   }
@@ -43485,13 +43490,13 @@ const settingsStore = new ElectronStore({
 const activeConnections = /* @__PURE__ */ new Map();
 const storeService = {
   getConnections: () => {
-    const connections = store.get("connections");
+    const connections = connectionStore.get("connections");
     return connections.map((conn) => ({ ...conn }));
   },
   addConnection: (connection2) => {
-    const connections = store.get("connections");
-    store.set("connections", [...connections, connection2]);
-    return store.get("connections").map((conn) => ({ ...conn }));
+    const connections = connectionStore.get("connections");
+    connectionStore.set("connections", [...connections, connection2]);
+    return connectionStore.get("connections").map((conn) => ({ ...conn }));
   },
   deleteConnection: (id2) => {
     var _a;
@@ -43499,8 +43504,8 @@ const storeService = {
       (_a = activeConnections.get(id2)) == null ? void 0 : _a.disconnect();
       activeConnections.delete(id2);
     }
-    const connections = store.get("connections");
-    store.set(
+    const connections = connectionStore.get("connections");
+    connectionStore.set(
       "connections",
       connections.filter((conn) => conn.id !== id2)
     );
@@ -43509,14 +43514,14 @@ const storeService = {
       delete schemas[id2];
       schemaStore.set("schemas", schemas);
     }
-    return store.get("connections").map((conn) => ({ ...conn }));
+    return connectionStore.get("connections").map((conn) => ({ ...conn }));
   },
   updateAllConnections: (connections) => {
-    store.set("connections", connections);
-    return store.get("connections").map((conn) => ({ ...conn }));
+    connectionStore.set("connections", connections);
+    return connectionStore.get("connections").map((conn) => ({ ...conn }));
   },
   connectToDb: async (id2) => {
-    const connections = store.get("connections");
+    const connections = connectionStore.get("connections");
     const connection2 = connections.find((conn) => conn.id === id2);
     if (connection2) {
       const dbService = new DatabaseService(connection2.dbType);
@@ -43756,25 +43761,32 @@ const storeService = {
     }
   },
   getDatabaseSchema: async (connectionId, forceRefresh = false) => {
+    const service = activeConnections.get(connectionId);
     if (!forceRefresh) {
       try {
         const cachedResult = await storeService.getCachedSchema(connectionId);
         if (cachedResult.success && cachedResult.cached) {
           console.log(`Using cached schema for connection ${connectionId}`);
-          return cachedResult.data;
+          return {
+            data: cachedResult.data,
+            dbType: service == null ? void 0 : service.dbType
+          };
         }
       } catch (error2) {
         console.error("Error checking for cached schema:", error2);
       }
     }
     console.log(`Fetching fresh schema for connection ${connectionId}`);
-    const service = activeConnections.get(connectionId);
     if (!service) {
       throw new Error(`No active connection for ID: ${connectionId}`);
     }
     const schemaData = await service.getDatabaseSchema();
+    const dbType = service.dbType;
     await storeService.cacheSchema(connectionId, schemaData);
-    return schemaData;
+    return {
+      data: schemaData,
+      dbType
+    };
   },
   // Settings methods
   getSettings: () => {
@@ -44181,7 +44193,12 @@ ipcMain$1.handle("delete-query", async (_, args) => {
 ipcMain$1.handle(
   "db:getDatabaseSchema",
   async (_, connectionId, forceRefresh = false) => {
-    return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+    const data = await storeService.getDatabaseSchema(
+      connectionId,
+      forceRefresh
+    );
+    console.log("Print the database type here=====>", data.dbType);
+    return data;
   }
 );
 ipcMain$1.handle("db:clearSchemaCache", async (_, connectionId) => {

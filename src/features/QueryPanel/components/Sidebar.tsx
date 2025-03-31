@@ -73,7 +73,7 @@ const Sidebar = ({
 							value="ai"
 							className="mt-2 border rounded-md shadow-sm"
 						>
-							<AIQueries />
+							<AIQueries connectionId={connectionId} />
 						</TabsContent>
 					</Tabs>
 				</div>

@@ -497,7 +497,12 @@ ipcMain.handle("delete-query", async (_, args) => {
 ipcMain.handle(
 	"db:getDatabaseSchema",
 	async (_, connectionId, forceRefresh = false) => {
-		return await storeService.getDatabaseSchema(connectionId, forceRefresh);
+		const data = await storeService.getDatabaseSchema(
+			connectionId,
+			forceRefresh,
+		);
+		console.log("Print the database type here=====>", data.dbType);
+		return data;
 	},
 );
 

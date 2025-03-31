@@ -60,7 +60,7 @@ interface SchemaCache {
 	};
 }
 
-const store = new Store<StoreSchema>({
+const connectionStore = new Store<StoreSchema>({
 	defaults: {
 		connections: [],
 	},
@@ -151,14 +151,14 @@ const activeConnections = new Map<string, DatabaseService>();
 export const storeService = {
 	getConnections: () => {
 		// Get connections from store but DON'T attach service instances
-		const connections = store.get("connections");
+		const connections = connectionStore.get("connections");
 		return connections.map((conn) => ({ ...conn })); // Return plain objects, not service instances
 	},
 
 	addConnection: (connection: Connection) => {
-		const connections = store.get("connections");
-		store.set("connections", [...connections, connection]);
-		return store.get("connections").map((conn) => ({ ...conn })); // Return plain objects
+		const connections = connectionStore.get("connections");
+		connectionStore.set("connections", [...connections, connection]);
+		return connectionStore.get("connections").map((conn) => ({ ...conn })); // Return plain objects
 	},
 
 	deleteConnection: (id: string) => {
@@ -168,8 +168,8 @@ export const storeService = {
 			activeConnections.delete(id);
 		}
 
-		const connections = store.get("connections");
-		store.set(
+		const connections = connectionStore.get("connections");
+		connectionStore.set(
 			"connections",
 			connections.filter((conn) => conn.id !== id),
 		);
@@ -181,16 +181,16 @@ export const storeService = {
 			schemaStore.set("schemas", schemas);
 		}
 
-		return store.get("connections").map((conn) => ({ ...conn })); // Return plain objects
+		return connectionStore.get("connections").map((conn) => ({ ...conn })); // Return plain objects
 	},
 
 	updateAllConnections: (connections: Connection[]) => {
-		store.set("connections", connections);
-		return store.get("connections").map((conn) => ({ ...conn })); // Return plain objects
+		connectionStore.set("connections", connections);
+		return connectionStore.get("connections").map((conn) => ({ ...conn })); // Return plain objects
 	},
 
 	connectToDb: async (id: string) => {
-		const connections = store.get("connections");
+		const connections = connectionStore.get("connections");
 		const connection = connections.find((conn) => conn.id === id);
 
 		if (connection) {
@@ -526,12 +526,16 @@ export const storeService = {
 
 	getDatabaseSchema: async (connectionId: string, forceRefresh = false) => {
 		// Check if there's a cached schema first
+		const service = activeConnections.get(connectionId);
 		if (!forceRefresh) {
 			try {
 				const cachedResult = await storeService.getCachedSchema(connectionId);
 				if (cachedResult.success && cachedResult.cached) {
 					console.log(`Using cached schema for connection ${connectionId}`);
-					return cachedResult.data;
+					return {
+						data: cachedResult.data,
+						dbType: service?.dbType,
+					};
 				}
 			} catch (error) {
 				console.error("Error checking for cached schema:", error);
@@ -541,7 +545,6 @@ export const storeService = {
 
 		// If no cache or force refresh, get fresh data
 		console.log(`Fetching fresh schema for connection ${connectionId}`);
-		const service = activeConnections.get(connectionId);
 		if (!service) {
 			throw new Error(`No active connection for ID: ${connectionId}`);
 		}
@@ -549,10 +552,16 @@ export const storeService = {
 		// Get fresh schema
 		const schemaData = await service.getDatabaseSchema();
 
+		// Get database type
+		const dbType = service.dbType;
+
 		// Cache the fresh schema
 		await storeService.cacheSchema(connectionId, schemaData);
 
-		return schemaData;
+		return {
+			data: schemaData,
+			dbType: dbType,
+		};
 	},
 
 	// Settings methods

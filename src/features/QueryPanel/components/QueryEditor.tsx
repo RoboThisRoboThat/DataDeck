@@ -149,7 +149,8 @@ const QueryEditor = forwardRef<EditorRefType, QueryEditorProps>(
 		useEffect(() => {
 			const fetchSchema = async () => {
 				try {
-					const schema = await window.database.getDatabaseSchema(connectionId);
+					const { data: schema } =
+						await window.database.getDatabaseSchema(connectionId);
 					// Map the schema from the database to match our component's expected interface
 					const mappedSchema = schema.map((table) => ({
 						name: table.name,

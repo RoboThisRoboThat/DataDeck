@@ -2,7 +2,7 @@ import MySQLService from "./mysql.service";
 import PostgresService from "./postgres.service";
 
 class DatabaseService {
-	private dbType: "mysql" | "postgres" = "mysql";
+	dbType: "mysql" | "postgres" = "mysql";
 	private service: MySQLService | PostgresService = new MySQLService();
 
 	constructor(dbType: "mysql" | "postgres") {
@@ -39,10 +39,8 @@ class DatabaseService {
 				password: config.password,
 				database: config.database,
 			});
-
-			if (result.success) {
-				this.dbType = config.dbType;
-			}
+			this.dbType = config.dbType;
+			console.log("Print the database type here=====>", this.dbType);
 
 			return result;
 		} catch (error) {
