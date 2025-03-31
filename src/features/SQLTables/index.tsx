@@ -11,6 +11,7 @@ import {
 	TabsContent,
 } from "../../components/ui/tabs";
 import { Button } from "../../components/ui/button";
+import RightSidebar from "./components/RightSidebar";
 
 interface SQLTablesProps {
 	connectionId: string;
@@ -121,23 +122,23 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 				onValueChange={setCurrentActiveTab}
 				className="flex-1 h-full flex flex-col"
 			>
-				<div className="border-b">
-					<TabsList className="w-full justify-start rounded-none px-2 h-11 bg-background">
+				<div className="border-b bg-muted/30">
+					<TabsList className="w-full justify-start rounded-none px-2 h-11 bg-transparent">
 						<TabsTrigger
 							value="tables"
-							className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+							className="rounded-t-md mx-[1px] data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-t-[3px] data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:shadow-md data-[state=active]:z-10 data-[state=inactive]:text-muted-foreground data-[state=inactive]:border-b data-[state=inactive]:border-muted-foreground/20 hover:text-foreground hover:bg-muted/70 transition-colors px-5 py-2 relative mr-1"
 						>
 							Tables
 						</TabsTrigger>
 						<TabsTrigger
 							value="query"
-							className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+							className="rounded-t-md mx-[1px] data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-t-[3px] data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:shadow-md data-[state=active]:z-10 data-[state=inactive]:text-muted-foreground data-[state=inactive]:border-b data-[state=inactive]:border-muted-foreground/20 hover:text-foreground hover:bg-muted/70 transition-colors px-5 py-2 relative mx-1"
 						>
 							Query
 						</TabsTrigger>
 						<TabsTrigger
 							value="er-diagram"
-							className="rounded-sm data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none px-3"
+							className="rounded-t-md mx-[1px] data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:border-t-[3px] data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:shadow-md data-[state=active]:z-10 data-[state=inactive]:text-muted-foreground data-[state=inactive]:border-b data-[state=inactive]:border-muted-foreground/20 hover:text-foreground hover:bg-muted/70 transition-colors px-5 py-2 relative ml-1"
 						>
 							ER Diagram
 						</TabsTrigger>
@@ -152,6 +153,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 						className="flex flex-1 flex-row h-screen"
 						id="main-tables-container"
 					>
+						{/* Left Sidebar to show table listing */}
 						<TableList
 							tables={allTables}
 							openTables={tables}
@@ -162,8 +164,11 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							handleKeyDown={handleKeyDown}
 						/>
 
-						{/* Main Content */}
-						<div className="flex flex-col overflow-hidden bg-background">
+						{/* Main content to show table data */}
+						<div
+							style={{ width: "calc(100vw - 256px - 288px)" }}
+							className="flex flex-col overflow-hidden bg-background"
+						>
 							{loading && (
 								<div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md dark:bg-blue-900/20 dark:border-blue-800/30 dark:text-blue-400">
 									Loading tables...
@@ -195,10 +200,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							/>
 
 							{/* Table Content */}
-							<div
-								style={{ width: "calc(100vw - 256px)" }}
-								className="flex-1 overflow-hidden"
-							>
+							<div className="flex-1 overflow-hidden">
 								{activeTable ? (
 									<div className="flex-1 h-full flex flex-col">
 										{/* Data Table */}
@@ -223,6 +225,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 								)}
 							</div>
 						</div>
+						{/* Right Sidebar to the data of the selected row */}
+						<RightSidebar connectionId={connectionId} />
 					</div>
 				</TabsContent>
 

@@ -8,6 +8,7 @@ import type {
 	FilterCondition,
 	SortConfig,
 	PaginationState,
+	TableDataRow,
 } from "../../features/SQLTables/types";
 
 // Initial state
@@ -29,6 +30,7 @@ const defaultTableState: TableState = {
 	primaryKeys: [],
 	structure: [],
 	editingCell: null,
+	selectedRow: null,
 };
 
 // Helper function to build SQL filter condition
@@ -90,13 +92,6 @@ export const fetchTableData = createAsyncThunk(
 		{ rejectWithValue },
 	) => {
 		try {
-			console.log(
-				"Here is the table name",
-				tableName,
-				"connection ID:",
-				connectionId,
-			);
-			// First get filtered count if there are filters
 			let totalRows = 0;
 			if (Object.keys(filters).length > 0) {
 				const filterConditions = Object.entries(filters)
@@ -106,12 +101,6 @@ export const fetchTableData = createAsyncThunk(
 					.join(" AND ");
 
 				const countQuery = `SELECT COUNT(*) as total FROM ${tableName}${filterConditions ? ` WHERE ${filterConditions}` : ""}`;
-				console.log(
-					"Count query with tableName:",
-					countQuery,
-					"| Raw tableName:",
-					tableName,
-				);
 				const countResult = await window.database.query(
 					connectionId,
 					countQuery,
@@ -149,8 +138,6 @@ export const fetchTableData = createAsyncThunk(
 			// Add pagination
 			const offset = pagination.page * pagination.rowsPerPage;
 			query += ` LIMIT ${pagination.rowsPerPage} OFFSET ${offset}`;
-
-			console.log("Data query:", query); // For debugging
 			const result = await window.database.query(connectionId, query);
 
 			if (result && result.length > 0) {
@@ -169,7 +156,6 @@ export const fetchTableData = createAsyncThunk(
 				totalRows: 0,
 			};
 		} catch (error) {
-			console.error("Failed to load table data:", error);
 			return rejectWithValue(
 				error instanceof Error ? error.message : String(error),
 			);
@@ -191,10 +177,6 @@ export const fetchPrimaryKeys = createAsyncThunk(
 		{ rejectWithValue },
 	) => {
 		try {
-			console.log(
-				`Fetching primary keys for table: ${tableName}, connection: ${connectionId}`,
-			);
-			// Check if window.database.getPrimaryKey exists
 			if (typeof window.database.getPrimaryKey !== "function") {
 				console.error(
 					"window.database.getPrimaryKey is not a function!",
@@ -207,10 +189,8 @@ export const fetchPrimaryKeys = createAsyncThunk(
 				connectionId,
 				tableName,
 			);
-			console.log(`Received primary keys for table ${tableName}:`, primaryKeys);
 			return { tableName, primaryKeys };
 		} catch (error) {
-			console.error("Failed to fetch primary keys:", error);
 			return rejectWithValue(
 				error instanceof Error ? error.message : String(error),
 			);
@@ -232,11 +212,6 @@ export const fetchTableStructure = createAsyncThunk(
 		{ rejectWithValue },
 	) => {
 		try {
-			console.log(
-				`Fetching table structure for table: ${tableName}, connection: ${connectionId}`,
-			);
-
-			// Check if window.database.getTableStructure exists
 			if (typeof window.database.getTableStructure !== "function") {
 				console.error(
 					"window.database.getTableStructure is not a function!",
@@ -249,13 +224,8 @@ export const fetchTableStructure = createAsyncThunk(
 				connectionId,
 				tableName,
 			);
-			console.log(
-				`Received table structure for table ${tableName}:`,
-				structure,
-			);
 			return { tableName, structure };
 		} catch (error) {
-			console.error("Failed to fetch table structure:", error);
 			return rejectWithValue(
 				error instanceof Error ? error.message : String(error),
 			);
@@ -263,62 +233,12 @@ export const fetchTableStructure = createAsyncThunk(
 	},
 );
 
-// Add a new thunk for updating cell value
+// Update the updateCellValue action to not store errors in Redux state
 export const updateCellValue = createAsyncThunk(
 	"tables/updateCellValue",
-	async (
-		{
-			tableName,
-			connectionId,
-			primaryKeyColumn,
-			primaryKeyValue,
-			columnToUpdate,
-			newValue,
-			filters,
-			sortConfig,
-			pagination,
-		}: {
-			tableName: string;
-			connectionId: string;
-			primaryKeyColumn: string;
-			primaryKeyValue: string | number;
-			columnToUpdate: string;
-			newValue: any;
-			filters: Record<string, FilterCondition>;
-			sortConfig: SortConfig;
-			pagination: PaginationState;
-		},
-		{ dispatch, rejectWithValue },
-	) => {
-		try {
-			// Update the cell in the database
-			await window.database.updateCell(
-				connectionId,
-				tableName,
-				primaryKeyColumn,
-				primaryKeyValue,
-				columnToUpdate,
-				newValue,
-			);
-
-			// Refetch the table data to update the UI
-			await dispatch(
-				fetchTableData({
-					tableName,
-					connectionId,
-					filters,
-					sortConfig,
-					pagination,
-				}),
-			);
-
-			return { success: true };
-		} catch (error) {
-			console.error("Failed to update cell:", error);
-			return rejectWithValue(
-				error instanceof Error ? error.message : String(error),
-			);
-		}
+	async (params: UpdateCellValueParams) => {
+		const response = await window.database.updateCell(params);
+		return response;
 	},
 );
 
@@ -417,6 +337,24 @@ const tablesSlice = createSlice({
 
 			state.tables[tableName].editingCell = editingCell;
 		},
+
+		// Add new reducer for setting selected row
+		setSelectedRow: (
+			state,
+			action: PayloadAction<{
+				tableName: string;
+				selectedRow: TableDataRow | null;
+			}>,
+		) => {
+			const { tableName, selectedRow } = action.payload;
+
+			// Initialize table state if it doesn't exist
+			if (!state.tables[tableName]) {
+				state.tables[tableName] = { ...defaultTableState };
+			}
+
+			state.tables[tableName].selectedRow = selectedRow;
+		},
 	},
 	extraReducers: (builder) => {
 		builder
@@ -503,15 +441,10 @@ const tablesSlice = createSlice({
 				}
 			})
 			.addCase(updateCellValue.fulfilled, (state, action) => {
-				// Nothing to do here, as fetchTableData will update the state
+				// Handle success case
 			})
 			.addCase(updateCellValue.rejected, (state, action) => {
-				const tableName = action.meta.arg.tableName;
-
-				if (state.tables[tableName]) {
-					state.tables[tableName].loading = false;
-					state.tables[tableName].error = action.payload as string;
-				}
+				// Don't store error in Redux state
 			});
 	},
 });
@@ -524,6 +457,7 @@ export const {
 	setPagination,
 	clearTableState,
 	setEditingCell,
+	setSelectedRow,
 } = tablesSlice.actions;
 
 // Export reducer

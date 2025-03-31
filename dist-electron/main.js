@@ -40669,9 +40669,13 @@ class MySQLService {
     }
   }
   async disconnect() {
-    if (this.connection) {
-      await this.connection.end();
-      this.connection = null;
+    try {
+      if (this.connection) {
+        await this.connection.end();
+        this.connection = null;
+      }
+    } catch (error2) {
+      console.error("Error disconnecting from MySQL:", error2);
     }
   }
   async query(sql) {
@@ -40680,9 +40684,33 @@ class MySQLService {
         throw new Error("No database connection");
       }
       const [results] = await this.connection.execute(sql);
+      console.log("MySQL query results:", results[0]);
       return results;
     } catch (error2) {
       console.error("Error in query method:", error2);
+      if (error2 instanceof Error && error2.message.toLowerCase().includes("closed")) {
+        console.log("Connection closed, attempting to reconnect...");
+        try {
+          if (this.connection) {
+            const config = this.connection.config;
+            await this.disconnect();
+            await this.connect({
+              host: config.host,
+              port: String(config.port),
+              user: config.user,
+              password: config.password,
+              database: config.database
+            });
+            if (this.connection) {
+              const [results] = await this.connection.execute(sql);
+              return results;
+            }
+          }
+        } catch (reconnectError) {
+          console.error("Failed to reconnect and retry query:", reconnectError);
+          throw reconnectError;
+        }
+      }
       throw error2;
     }
   }
@@ -40846,24 +40874,30 @@ class MySQLService {
         [tableName]
       );
       return columns.map(
-        (col) => {
-          const dataType2 = col.DATA_TYPE.toLowerCase();
-          let type2 = "string";
-          if (dataType2 === "json" || dataType2.includes("blob")) {
-            type2 = "json";
-          } else if (dataType2.includes("int") || dataType2 === "decimal" || dataType2 === "float" || dataType2 === "double" || dataType2 === "real") {
-            type2 = "number";
-          } else if (dataType2 === "tinyint(1)" || dataType2 === "boolean" || dataType2 === "bool") {
-            type2 = "boolean";
-          }
-          return {
-            column: col.COLUMN_NAME,
-            type: type2
-          };
-        }
+        (col) => ({
+          column: col.COLUMN_NAME,
+          type: col.DATA_TYPE.toLowerCase()
+        })
       );
     } catch (error2) {
       console.error("Error getting MySQL table structure:", error2);
+      throw error2;
+    }
+  }
+  async addRow(tableName, data) {
+    if (!this.connection) throw new Error("No MySQL connection");
+    try {
+      const columns = Object.keys(data);
+      const values2 = Object.values(data);
+      const placeholders = columns.map(() => "?").join(", ");
+      const columnsList = columns.join(", ");
+      const sql = `INSERT INTO ${tableName} (${columnsList}) VALUES (${placeholders})`;
+      console.log("MySQL add row SQL:", sql);
+      await this.connection.execute(sql, values2);
+      console.log("Row addition successful");
+      return true;
+    } catch (error2) {
+      console.error("Error adding row:", error2);
       throw error2;
     }
   }
@@ -42921,18 +42955,18 @@ function osUsername() {
 }
 class PostgresService {
   constructor() {
-    __publicField(this, "pgClient", null);
+    __publicField(this, "connection", null);
   }
   async connect(config) {
     try {
-      this.pgClient = Postgres({
+      this.connection = Postgres({
         host: config.host,
         port: Number.parseInt(config.port),
         user: config.user,
         password: config.password,
         database: config.database
       });
-      await this.pgClient`SELECT 1`;
+      await this.connection`SELECT 1`;
       return { success: true, message: "Connected successfully" };
     } catch (error2) {
       console.error("Error connecting to PostgreSQL:", error2);
@@ -42944,9 +42978,9 @@ class PostgresService {
   }
   async disconnect() {
     try {
-      if (this.pgClient) {
-        await this.pgClient.end();
-        this.pgClient = null;
+      if (this.connection) {
+        await this.connection.end();
+        this.connection = null;
       }
     } catch (error2) {
       console.error("Error in disconnect method:", error2);
@@ -42954,9 +42988,9 @@ class PostgresService {
     }
   }
   async query(sql) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f;
     try {
-      if (!this.pgClient) {
+      if (!this.connection) {
         throw new Error("No PostgreSQL connection");
       }
       let modifiedSql = sql;
@@ -42979,11 +43013,37 @@ class PostgresService {
         }
       );
       try {
-        const rows = await this.pgClient.unsafe(modifiedSql);
+        const rows = await this.connection.unsafe(modifiedSql);
         return rows;
       } catch (pgError) {
-        if (pgError instanceof Error && ((_a = pgError.message) == null ? void 0 : _a.includes("relation")) && ((_b = pgError.message) == null ? void 0 : _b.includes("does not exist"))) {
-          const tableName = ((_c = pgError.message.match(/relation "([^"]+)" does not exist/)) == null ? void 0 : _c[1]) || "unknown";
+        if (pgError instanceof Error && (((_a = pgError.message) == null ? void 0 : _a.includes("Connection terminated")) || ((_b = pgError.message) == null ? void 0 : _b.includes("Connection closed")) || ((_c = pgError.message) == null ? void 0 : _c.includes("cannot acquire a connection")))) {
+          console.log("Connection closed, attempting to reconnect...");
+          try {
+            if (this.connection) {
+              const config = this.connection.options;
+              await this.disconnect();
+              await this.connect({
+                host: config.host,
+                port: String(config.port),
+                user: config.user,
+                password: config.password,
+                database: config.database
+              });
+              if (this.connection) {
+                const rows = await this.connection.unsafe(modifiedSql);
+                return rows;
+              }
+            }
+          } catch (reconnectError) {
+            console.error(
+              "Failed to reconnect and retry query:",
+              reconnectError
+            );
+            throw reconnectError;
+          }
+        }
+        if (pgError instanceof Error && ((_d = pgError.message) == null ? void 0 : _d.includes("relation")) && ((_e = pgError.message) == null ? void 0 : _e.includes("does not exist"))) {
+          const tableName = ((_f = pgError.message.match(/relation "([^"]+)" does not exist/)) == null ? void 0 : _f[1]) || "unknown";
           throw new Error(
             `Table "${tableName}" does not exist in the database. Please check the table name and ensure it exists.`
           );
@@ -42997,10 +43057,10 @@ class PostgresService {
   }
   async getTables() {
     try {
-      if (!this.pgClient) {
+      if (!this.connection) {
         throw new Error("No PostgreSQL connection");
       }
-      const rows = await this.pgClient`
+      const rows = await this.connection`
                 SELECT 
                     table_name,
                     -- This gets the actual name including case sensitivity
@@ -43024,11 +43084,11 @@ class PostgresService {
     }
   }
   async tableExists(tableName) {
-    if (!this.pgClient) {
+    if (!this.connection) {
       return false;
     }
     try {
-      const result = await this.pgClient`
+      const result = await this.connection`
                 SELECT COUNT(*) as count 
                 FROM information_schema.tables 
                 WHERE table_schema = 'public' 
@@ -43041,7 +43101,7 @@ class PostgresService {
     }
   }
   async getPrimaryKey(tableName) {
-    if (!this.pgClient) {
+    if (!this.connection) {
       console.log("No PostgreSQL client available");
       return [];
     }
@@ -43054,7 +43114,7 @@ class PostgresService {
       console.log("Correct table name from PostgreSQL:", correctTableName);
       if (!correctTableName) {
         console.log(`Table ${tableName} not found in PostgreSQL database`);
-        const allTables = await this.pgClient`
+        const allTables = await this.connection`
                     SELECT table_name FROM information_schema.tables 
                     WHERE table_schema = 'public'
                 `;
@@ -43067,7 +43127,7 @@ class PostgresService {
       const tableNameForQueries = correctTableName.toLowerCase();
       console.log("Using table name for queries:", tableNameForQueries);
       console.log("Using pg_index approach to get primary keys");
-      const primaryKeys = await this.pgClient.unsafe(`
+      const primaryKeys = await this.connection.unsafe(`
                 SELECT a.attname as column_name
                 FROM pg_index i
                 JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -43093,7 +43153,7 @@ class PostgresService {
     }
   }
   async updateCell(tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue) {
-    if (!this.pgClient) throw new Error("No PostgreSQL connection");
+    if (!this.connection) throw new Error("No PostgreSQL connection");
     try {
       const correctTableName = await this.getCorrectTableNameForPostgres(tableName);
       console.log("Correct table name from PostgreSQL:", correctTableName);
@@ -43106,7 +43166,7 @@ class PostgresService {
       const sql = `UPDATE ${quotedTableName} SET ${quotedColumnToUpdate} = $1 WHERE ${quotedPrimaryKeyColumn} = $2`;
       console.log("PostgreSQL update SQL:", sql);
       console.log("With parameters:", [newValue, primaryKeyValue]);
-      await this.pgClient.unsafe(sql, [newValue, primaryKeyValue]);
+      await this.connection.unsafe(sql, [newValue, primaryKeyValue]);
       console.log("Cell update successful");
       return true;
     } catch (error2) {
@@ -43123,23 +43183,23 @@ class PostgresService {
   }
   // Helper function to check if a table exists and get its correct casing
   async getCorrectTableNameForPostgres(tableName) {
-    if (!this.pgClient) return null;
+    if (!this.connection) return null;
     try {
-      const exactResult = await this.pgClient`
+      const exactResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_name = ${tableName}
             `;
       if (exactResult.length > 0) {
         return exactResult[0].table_name;
       }
-      const lowercaseResult = await this.pgClient`
+      const lowercaseResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_name = ${tableName.toLowerCase()}
             `;
       if (lowercaseResult.length > 0) {
         return lowercaseResult[0].table_name;
       }
-      const similarResult = await this.pgClient`
+      const similarResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE LOWER(table_name) = ${tableName.toLowerCase()}
             `;
@@ -43153,11 +43213,10 @@ class PostgresService {
     }
   }
   async cancelQuery() {
-    if (!this.pgClient) {
+    if (!this.connection) {
       throw new Error("No database connection");
     }
     try {
-      await this.pgClient.cancel();
       return true;
     } catch (error2) {
       console.error("Error canceling query:", error2);
@@ -43165,11 +43224,11 @@ class PostgresService {
     }
   }
   async getDatabaseSchema() {
-    if (!this.pgClient) {
+    if (!this.connection) {
       throw new Error("No PostgreSQL connection");
     }
     try {
-      const tables = await this.pgClient`
+      const tables = await this.connection`
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
@@ -43178,7 +43237,7 @@ class PostgresService {
       const result = [];
       for (const table of tables) {
         const tableName = table.table_name;
-        const columns = await this.pgClient`
+        const columns = await this.connection`
                     SELECT 
                         column_name, 
                         data_type,
@@ -43191,7 +43250,7 @@ class PostgresService {
                     AND table_name = ${tableName}
                     ORDER BY ordinal_position
                 `;
-        const primaryKeys = await this.pgClient`
+        const primaryKeys = await this.connection`
                     SELECT kcu.column_name
                     FROM information_schema.table_constraints tc
                     JOIN information_schema.key_column_usage kcu
@@ -43202,7 +43261,7 @@ class PostgresService {
                       AND tc.table_name = ${tableName}
                 `;
         const primaryKeyColumns = primaryKeys.map((pk) => pk.column_name);
-        const foreignKeys = await this.pgClient`
+        const foreignKeys = await this.connection`
                     SELECT
                         kcu.column_name,
                         ccu.table_name AS referenced_table_name,
@@ -43242,7 +43301,7 @@ class PostgresService {
     }
   }
   async getTableStructure(tableName) {
-    if (!this.pgClient) {
+    if (!this.connection) {
       throw new Error("No PostgreSQL connection");
     }
     try {
@@ -43250,7 +43309,7 @@ class PostgresService {
       if (!correctTableName) {
         throw new Error(`Table ${tableName} not found in PostgreSQL database`);
       }
-      const columns = await this.pgClient`
+      const columns = await this.connection`
                 SELECT 
                     column_name, 
                     data_type,
@@ -43261,23 +43320,39 @@ class PostgresService {
                 ORDER BY ordinal_position
             `;
       return columns.map((col) => {
-        const dataType2 = col.data_type.toLowerCase();
-        const udtName = col.udt_name.toLowerCase();
-        let type2 = "string";
-        if (dataType2 === "json" || dataType2 === "jsonb" || dataType2.includes("bytea")) {
-          type2 = "json";
-        } else if (dataType2.includes("int") || dataType2 === "numeric" || dataType2 === "decimal" || dataType2 === "real" || dataType2 === "double precision" || udtName === "float4" || udtName === "float8") {
-          type2 = "number";
-        } else if (dataType2 === "boolean" || udtName === "bool") {
-          type2 = "boolean";
-        }
         return {
           column: col.column_name,
-          type: type2
+          type: col.data_type.toLowerCase()
         };
       });
     } catch (error2) {
       console.error("Error getting PostgreSQL table structure:", error2);
+      throw error2;
+    }
+  }
+  async addRow(tableName, data) {
+    if (!this.connection) throw new Error("No PostgreSQL connection");
+    try {
+      const correctTableName = await this.getCorrectTableNameForPostgres(tableName);
+      console.log("Correct table name from PostgreSQL:", correctTableName);
+      if (!correctTableName) {
+        throw new Error(`Table ${tableName} not found in PostgreSQL database`);
+      }
+      const quotedTableName = this.quotePostgresIdentifier(correctTableName);
+      const columns = Object.keys(data);
+      const quotedColumns = columns.map(
+        (col) => this.quotePostgresIdentifier(col)
+      );
+      const values2 = Object.values(data);
+      const placeholders = values2.map((_, index) => `$${index + 1}`).join(", ");
+      const sql = `INSERT INTO ${quotedTableName} (${quotedColumns.join(", ")}) VALUES (${placeholders})`;
+      console.log("PostgreSQL add row SQL:", sql);
+      console.log("With parameters:", values2);
+      await this.connection.unsafe(sql, values2);
+      console.log("Row addition successful");
+      return true;
+    } catch (error2) {
+      console.error("Error adding row:", error2);
       throw error2;
     }
   }
@@ -43406,6 +43481,18 @@ class DatabaseService {
       throw new Error("No database connection");
     }
     return await this.service.getTableStructure(tableName);
+  }
+  // Add a new row to a table
+  async addRow(tableName, data) {
+    if (!this.dbType) {
+      throw new Error("No database connection");
+    }
+    try {
+      return await this.service.addRow(tableName, data);
+    } catch (error2) {
+      console.error("Error adding row:", error2);
+      throw error2;
+    }
   }
 }
 const connectionStore = new ElectronStore({
@@ -43825,6 +43912,11 @@ const storeService = {
       console.error("Error updating AI settings:", error2);
       throw error2;
     }
+  },
+  async addRow(connectionId, tableName, data) {
+    const service = activeConnections.get(connectionId);
+    if (!service) throw new Error("No active connection with this ID");
+    return await service.addRow(tableName, data);
   }
 };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44033,9 +44125,7 @@ ipcMain$1.handle("db:getActiveConnections", () => {
   return storeService.getActiveConnections();
 });
 ipcMain$1.handle("db:query", async (_, connectionId, sql) => {
-  console.log("Main process: query operation with ID:", connectionId);
   if (!connectionId) {
-    console.error("Main process: connection ID is undefined/empty for query");
     throw new Error("Connection ID is required");
   }
   return await storeService.query(connectionId, sql);
@@ -44097,6 +44187,7 @@ ipcMain$1.handle(
   "db:updateCell",
   async (_, connectionId, tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue) => {
     try {
+      console.log("Print the connection id here:=======>", connectionId);
       const result = await storeService.updateCell(
         connectionId,
         tableName,
@@ -44305,6 +44396,17 @@ ipcMain$1.handle("debug:getAISettings", () => {
     openaiKeyPreview: ((_c = settings == null ? void 0 : settings.ai) == null ? void 0 : _c.openaiApiKey) ? `${settings.ai.openaiApiKey.substring(0, 3)}...${settings.ai.openaiApiKey.substring(settings.ai.openaiApiKey.length - 4)}` : null,
     claudeKeyPreview: ((_d = settings == null ? void 0 : settings.ai) == null ? void 0 : _d.claudeApiKey) ? `${settings.ai.claudeApiKey.substring(0, 3)}...${settings.ai.claudeApiKey.substring(settings.ai.claudeApiKey.length - 4)}` : null
   };
+});
+ipcMain$1.handle("db:addRow", async (_, connectionId, tableName, data) => {
+  try {
+    console.log("IPC: Adding new row to table:", tableName, "data:", data);
+    const result = await storeService.addRow(connectionId, tableName, data);
+    console.log("IPC: Row addition result:", result);
+    return result;
+  } catch (error2) {
+    console.error("IPC: Error adding new row:", error2);
+    throw error2;
+  }
 });
 export {
   MAIN_DIST,

@@ -1,7 +1,7 @@
 import postgres from "postgres";
 
 class PostgresService {
-	private pgClient: postgres.Sql<Record<string, unknown>> | null = null;
+	connection: postgres.Sql<Record<string, unknown>> | null = null;
 
 	async connect(config: {
 		host: string;
@@ -12,7 +12,7 @@ class PostgresService {
 	}) {
 		try {
 			// Using postgres library
-			this.pgClient = postgres({
+			this.connection = postgres({
 				host: config.host,
 				port: Number.parseInt(config.port),
 				user: config.user,
@@ -21,7 +21,7 @@ class PostgresService {
 			});
 
 			// Test the connection with a simple query
-			await this.pgClient`SELECT 1`;
+			await this.connection`SELECT 1`;
 			return { success: true, message: "Connected successfully" };
 		} catch (error) {
 			console.error("Error connecting to PostgreSQL:", error);
@@ -34,10 +34,10 @@ class PostgresService {
 
 	async disconnect() {
 		try {
-			if (this.pgClient) {
+			if (this.connection) {
 				// The postgres library has an end method to close connections
-				await this.pgClient.end();
-				this.pgClient = null;
+				await this.connection.end();
+				this.connection = null;
 			}
 		} catch (error) {
 			console.error("Error in disconnect method:", error);
@@ -47,7 +47,7 @@ class PostgresService {
 
 	async query(sql: string) {
 		try {
-			if (!this.pgClient) {
+			if (!this.connection) {
 				throw new Error("No PostgreSQL connection");
 			}
 
@@ -79,9 +79,45 @@ class PostgresService {
 			);
 
 			try {
-				const rows = await this.pgClient.unsafe(modifiedSql);
+				const rows = await this.connection.unsafe(modifiedSql);
 				return rows;
 			} catch (pgError) {
+				// Check if the error is related to a closed connection
+				if (
+					pgError instanceof Error &&
+					(pgError.message?.includes("Connection terminated") ||
+						pgError.message?.includes("Connection closed") ||
+						pgError.message?.includes("cannot acquire a connection"))
+				) {
+					console.log("Connection closed, attempting to reconnect...");
+					try {
+						// Get the current connection config and reconnect
+						if (this.connection) {
+							const config = this.connection.options;
+							await this.disconnect();
+							await this.connect({
+								host: config.host as string,
+								port: String(config.port),
+								user: config.user as string,
+								password: config.password as string,
+								database: config.database as string,
+							});
+
+							// Try the query again
+							if (this.connection) {
+								const rows = await this.connection.unsafe(modifiedSql);
+								return rows;
+							}
+						}
+					} catch (reconnectError) {
+						console.error(
+							"Failed to reconnect and retry query:",
+							reconnectError,
+						);
+						throw reconnectError;
+					}
+				}
+
 				// Add more helpful error messages for common PostgreSQL errors
 				if (
 					pgError instanceof Error &&
@@ -106,12 +142,12 @@ class PostgresService {
 
 	async getTables() {
 		try {
-			if (!this.pgClient) {
+			if (!this.connection) {
 				throw new Error("No PostgreSQL connection");
 			}
 
 			// PostgreSQL query that includes both the table name and its case-sensitive form
-			const rows = await this.pgClient`
+			const rows = await this.connection`
                 SELECT 
                     table_name,
                     -- This gets the actual name including case sensitivity
@@ -136,12 +172,12 @@ class PostgresService {
 	}
 
 	async tableExists(tableName: string): Promise<boolean> {
-		if (!this.pgClient) {
+		if (!this.connection) {
 			return false;
 		}
 
 		try {
-			const result = await this.pgClient`
+			const result = await this.connection`
                 SELECT COUNT(*) as count 
                 FROM information_schema.tables 
                 WHERE table_schema = 'public' 
@@ -155,7 +191,7 @@ class PostgresService {
 	}
 
 	async getPrimaryKey(tableName: string): Promise<string[]> {
-		if (!this.pgClient) {
+		if (!this.connection) {
 			console.log("No PostgreSQL client available");
 			return [];
 		}
@@ -175,7 +211,7 @@ class PostgresService {
 				console.log(`Table ${tableName} not found in PostgreSQL database`);
 
 				// Try to get a list of all tables to see what's available
-				const allTables = await this.pgClient`
+				const allTables = await this.connection`
                     SELECT table_name FROM information_schema.tables 
                     WHERE table_schema = 'public'
                 `;
@@ -192,7 +228,7 @@ class PostgresService {
 
 			// Use only the pg_index approach
 			console.log("Using pg_index approach to get primary keys");
-			const primaryKeys = await this.pgClient.unsafe(`
+			const primaryKeys = await this.connection.unsafe(`
                 SELECT a.attname as column_name
                 FROM pg_index i
                 JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -227,7 +263,7 @@ class PostgresService {
 		columnToUpdate: string,
 		newValue: unknown,
 	): Promise<boolean> {
-		if (!this.pgClient) throw new Error("No PostgreSQL connection");
+		if (!this.connection) throw new Error("No PostgreSQL connection");
 		try {
 			// Get the correct table name with proper casing
 			const correctTableName =
@@ -248,7 +284,7 @@ class PostgresService {
 			const sql = `UPDATE ${quotedTableName} SET ${quotedColumnToUpdate} = $1 WHERE ${quotedPrimaryKeyColumn} = $2`;
 			console.log("PostgreSQL update SQL:", sql);
 			console.log("With parameters:", [newValue, primaryKeyValue]);
-			await this.pgClient.unsafe(sql, [newValue, primaryKeyValue]);
+			await this.connection.unsafe(sql, [newValue, primaryKeyValue]);
 
 			console.log("Cell update successful");
 			return true;
@@ -272,11 +308,11 @@ class PostgresService {
 	private async getCorrectTableNameForPostgres(
 		tableName: string,
 	): Promise<string | null> {
-		if (!this.pgClient) return null;
+		if (!this.connection) return null;
 
 		try {
 			// First try with the exact name
-			const exactResult = await this.pgClient`
+			const exactResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_name = ${tableName}
             `;
@@ -286,7 +322,7 @@ class PostgresService {
 			}
 
 			// Then try with lowercase
-			const lowercaseResult = await this.pgClient`
+			const lowercaseResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_name = ${tableName.toLowerCase()}
             `;
@@ -296,7 +332,7 @@ class PostgresService {
 			}
 
 			// If neither worked, try to find a case-insensitive match
-			const similarResult = await this.pgClient`
+			const similarResult = await this.connection`
                 SELECT table_name FROM information_schema.tables 
                 WHERE LOWER(table_name) = ${tableName.toLowerCase()}
             `;
@@ -313,13 +349,13 @@ class PostgresService {
 	}
 
 	async cancelQuery(): Promise<boolean> {
-		if (!this.pgClient) {
+		if (!this.connection) {
 			throw new Error("No database connection");
 		}
 
 		try {
 			// PostgreSQL supports canceling queries through the client
-			await this.pgClient.cancel();
+			// await this.connection.end();
 			return true;
 		} catch (error) {
 			console.error("Error canceling query:", error);
@@ -328,13 +364,13 @@ class PostgresService {
 	}
 
 	async getDatabaseSchema() {
-		if (!this.pgClient) {
+		if (!this.connection) {
 			throw new Error("No PostgreSQL connection");
 		}
 
 		try {
 			// Get all tables in the public schema
-			const tables = await this.pgClient`
+			const tables = await this.connection`
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
@@ -347,7 +383,7 @@ class PostgresService {
 				const tableName = table.table_name;
 
 				// Get columns with their properties
-				const columns = await this.pgClient`
+				const columns = await this.connection`
                     SELECT 
                         column_name, 
                         data_type,
@@ -362,7 +398,7 @@ class PostgresService {
                 `;
 
 				// Get primary key columns
-				const primaryKeys = await this.pgClient`
+				const primaryKeys = await this.connection`
                     SELECT kcu.column_name
                     FROM information_schema.table_constraints tc
                     JOIN information_schema.key_column_usage kcu
@@ -376,7 +412,7 @@ class PostgresService {
 				const primaryKeyColumns = primaryKeys.map((pk) => pk.column_name);
 
 				// Get foreign keys
-				const foreignKeys = await this.pgClient`
+				const foreignKeys = await this.connection`
                     SELECT
                         kcu.column_name,
                         ccu.table_name AS referenced_table_name,
@@ -420,7 +456,7 @@ class PostgresService {
 	}
 
 	async getTableStructure(tableName: string) {
-		if (!this.pgClient) {
+		if (!this.connection) {
 			throw new Error("No PostgreSQL connection");
 		}
 
@@ -434,7 +470,7 @@ class PostgresService {
 			}
 
 			// Get columns with their data types
-			const columns = await this.pgClient`
+			const columns = await this.connection`
                 SELECT 
                     column_name, 
                     data_type,
@@ -447,38 +483,55 @@ class PostgresService {
 
 			// Map PostgreSQL data types to the simplified types required
 			return columns.map((col) => {
-				const dataType = col.data_type.toLowerCase();
-				const udtName = col.udt_name.toLowerCase();
-				let type: "json" | "string" | "number" | "boolean" = "string"; // Default to string
-
-				// Map PostgreSQL types to our simplified types
-				if (
-					dataType === "json" ||
-					dataType === "jsonb" ||
-					dataType.includes("bytea")
-				) {
-					type = "json";
-				} else if (
-					dataType.includes("int") ||
-					dataType === "numeric" ||
-					dataType === "decimal" ||
-					dataType === "real" ||
-					dataType === "double precision" ||
-					udtName === "float4" ||
-					udtName === "float8"
-				) {
-					type = "number";
-				} else if (dataType === "boolean" || udtName === "bool") {
-					type = "boolean";
-				}
-
 				return {
 					column: col.column_name,
-					type,
+					type: col.data_type.toLowerCase(),
 				};
 			});
 		} catch (error) {
 			console.error("Error getting PostgreSQL table structure:", error);
+			throw error;
+		}
+	}
+
+	async addRow(
+		tableName: string,
+		data: Record<string, unknown>,
+	): Promise<boolean> {
+		if (!this.connection) throw new Error("No PostgreSQL connection");
+		try {
+			// Get the correct table name with proper casing
+			const correctTableName =
+				await this.getCorrectTableNameForPostgres(tableName);
+			console.log("Correct table name from PostgreSQL:", correctTableName);
+
+			if (!correctTableName) {
+				throw new Error(`Table ${tableName} not found in PostgreSQL database`);
+			}
+
+			// Quote the table name properly
+			const quotedTableName = this.quotePostgresIdentifier(correctTableName);
+
+			// Extract and quote column names
+			const columns = Object.keys(data);
+			const quotedColumns = columns.map((col) =>
+				this.quotePostgresIdentifier(col),
+			);
+
+			// Create parameter placeholders ($1, $2, etc.)
+			const values = Object.values(data);
+			const placeholders = values.map((_, index) => `$${index + 1}`).join(", ");
+
+			// Build the SQL query
+			const sql = `INSERT INTO ${quotedTableName} (${quotedColumns.join(", ")}) VALUES (${placeholders})`;
+			console.log("PostgreSQL add row SQL:", sql);
+			console.log("With parameters:", values);
+
+			await this.connection.unsafe(sql, values);
+			console.log("Row addition successful");
+			return true;
+		} catch (error) {
+			console.error("Error adding row:", error);
 			throw error;
 		}
 	}

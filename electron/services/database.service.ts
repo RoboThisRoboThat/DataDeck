@@ -161,6 +161,23 @@ class DatabaseService {
 
 		return await this.service.getTableStructure(tableName);
 	}
+
+	// Add a new row to a table
+	async addRow(
+		tableName: string,
+		data: Record<string, unknown>,
+	): Promise<boolean> {
+		if (!this.dbType) {
+			throw new Error("No database connection");
+		}
+
+		try {
+			return await this.service.addRow(tableName, data);
+		} catch (error) {
+			console.error("Error adding row:", error);
+			throw error;
+		}
+	}
 }
 
 export default DatabaseService;

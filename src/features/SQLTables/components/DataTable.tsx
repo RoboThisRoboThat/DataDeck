@@ -17,15 +17,16 @@ import {
 	FiFilter,
 	FiArrowUp,
 	FiArrowDown,
-	FiEdit2,
-	FiCopy,
+	FiX,
+	FiChevronLeft,
+	FiChevronRight,
 } from "react-icons/fi";
 import type { MouseEvent } from "react";
 import type { TableDataRow } from "../types";
 import JsonCell from "./JsonCell";
 import FilterModal from "./FilterModal";
-import EditCellModal from "./EditCellModal";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import dayjs from "dayjs";
 import {
 	fetchTableData,
 	setFilters,
@@ -33,10 +34,9 @@ import {
 	setPagination,
 	setActiveTable,
 	fetchPrimaryKeys,
-	setEditingCell,
 	fetchTableStructure,
+	setSelectedRow,
 } from "../../../store/slices/tablesSlice";
-import { cn } from "@/lib/utils";
 
 // Create a custom event for filter clicks
 const FILTER_CLICK_EVENT = "dataTableFilterClick";
@@ -49,11 +49,6 @@ interface DataTableProps {
 const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	const dispatch = useAppDispatch();
 	const tableRef = useRef<HTMLDivElement>(null);
-	const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-	const [hoveredCell, setHoveredCell] = useState<{
-		rowIndex: number;
-		columnName: string;
-	} | null>(null);
 
 	// Get table state from Redux
 	const tableState = useAppSelector(
@@ -69,6 +64,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				pagination: { page: 0, rowsPerPage: 100 },
 				primaryKeys: [],
 				editingCell: null,
+				selectedRow: null,
 			},
 	);
 
@@ -82,15 +78,21 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		sortConfig,
 		pagination,
 		primaryKeys,
-		editingCell,
+		selectedRow,
 	} = tableState;
 
 	// Filter modal state
 	const [filterModalOpen, setFilterModalOpen] = useState(false);
 	const [filterColumn, setFilterColumn] = useState("");
+	const filterModalOpenRef = useRef(false); // Add ref to track modal open state
 
 	// Track previous values to detect changes
 	const prevTableNameRef = useRef(tableName);
+
+	// Update ref when state changes
+	useEffect(() => {
+		filterModalOpenRef.current = filterModalOpen;
+	}, [filterModalOpen]);
 
 	// Add keyboard shortcut event listener
 	useEffect(() => {
@@ -99,21 +101,25 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			if ((e.metaKey || e.ctrlKey) && e.key === "f") {
 				e.preventDefault(); // Prevent browser's default find behavior
 
-				// Only open the modal if it's not already open
+				// Add a check to make sure we don't open when already open
 				if (!filterModalOpen) {
-					openGlobalFilterModal();
+					setFilterColumn(""); // Clear any pre-selected column
+					setFilterModalOpen(true);
 				}
 			}
 		};
 
 		document.addEventListener("keydown", handleKeyDown);
 		return () => document.removeEventListener("keydown", handleKeyDown);
-	}, [filterModalOpen]); // Add filterModalOpen as a dependency
+	}, [filterModalOpen]); // Add filterModalOpen to dependencies
 
 	// Function to open filter modal without pre-selecting a column
 	const openGlobalFilterModal = () => {
-		setFilterColumn(""); // Clear any pre-selected column
-		setFilterModalOpen(true);
+		// Use the ref for checking if modal is already open
+		if (!filterModalOpenRef.current) {
+			setFilterColumn(""); // Clear any pre-selected column
+			setFilterModalOpen(true);
+		}
 	};
 
 	// Set active table when component mounts
@@ -166,11 +172,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		data.length,
 		connectionId,
 	]);
-
-	// Handle column menu close
-	const handleColumnMenuClose = () => {
-		// No longer using anchorEl so this is simplified
-	};
 
 	// Listen for filter click events from the column menu
 	useEffect(() => {
@@ -232,9 +233,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				sortConfig: { column, direction },
 			}),
 		);
-
-		// Close the column menu
-		handleColumnMenuClose();
 	};
 
 	// Handle remove sort
@@ -284,50 +282,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	const handleFilterClick = (column: string) => {
 		setFilterColumn(column);
 		setFilterModalOpen(true);
-		handleColumnMenuClose();
-	};
-
-	// Handle cell edit
-	const handleCellEdit = (rowIndex: number, columnName: string) => {
-		console.log(
-			"Attempting to edit cell, primary keys available:",
-			primaryKeys,
-		);
-		if (primaryKeys.length === 0) {
-			console.log("No primary keys found, editing not allowed");
-			return; // No primary key, editing not allowed
-		}
-
-		const row = data[rowIndex];
-		const primaryKeyColumn = primaryKeys[0]; // Using the first primary key
-		const primaryKeyValue = row[primaryKeyColumn];
-
-		console.log(
-			`Using primary key column: ${primaryKeyColumn}, value: ${primaryKeyValue}`,
-		);
-
-		dispatch(
-			setEditingCell({
-				tableName,
-				editingCell: {
-					rowIndex,
-					columnName,
-					value: row[columnName],
-					primaryKeyColumn,
-					primaryKeyValue,
-				},
-			}),
-		);
-	};
-
-	// Handle closing the edit modal
-	const handleCloseEditModal = () => {
-		dispatch(
-			setEditingCell({
-				tableName,
-				editingCell: null,
-			}),
-		);
 	};
 
 	// Copy cell content to clipboard
@@ -350,6 +304,9 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			return "";
 		}
 
+		if (value instanceof Date) {
+			return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+		}
 		if (typeof value === "object") {
 			return JSON.stringify(value);
 		}
@@ -430,9 +387,19 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		return `${getColumnWidth(column)}px`;
 	};
 
+	// Handle row selection
+	const handleRowSelect = (row: TableDataRow) => {
+		dispatch(
+			setSelectedRow({
+				tableName,
+				selectedRow: row,
+			}),
+		);
+	};
+
 	// Render the table header
 	const renderTableHeader = () => (
-		<div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-100 shadow-sm">
+		<div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-100 shadow-sm w-fit">
 			{columns.map((column) => {
 				const width = getCellWidth(column);
 				const isPrimaryKey = primaryKeys.includes(column);
@@ -527,150 +494,98 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	);
 
 	// Render a table row
-	const renderTableRow = (row: TableDataRow, rowIndex: number) => (
-		<div
-			key={`row-${rowIndex}`}
-			className={`flex border-b border-gray-100 transition-colors duration-150 ${
-				hoveredRow === rowIndex
-					? "bg-blue-50/80"
-					: rowIndex % 2 === 0
-						? "bg-white"
-						: "bg-gray-50/60"
-			}`}
-			onMouseEnter={() => setHoveredRow(rowIndex)}
-			onMouseLeave={() => setHoveredRow(null)}
-		>
-			{columns.map((column) => {
-				const cellValue = row[column];
-				const isJson =
-					typeof cellValue === "object" &&
-					cellValue !== null &&
-					!(cellValue instanceof Date);
+	const renderTableRow = (row: TableDataRow, rowIndex: number) => {
+		// Check if this row is selected by comparing primary keys
+		const isSelected =
+			selectedRow && primaryKeys.length > 0
+				? primaryKeys.some((key) => selectedRow[key] === row[key])
+				: false;
 
-				const isPrimaryKey = primaryKeys.includes(column);
-				const isEditableCell = !isPrimaryKey; // Don't allow editing primary key
-				const isCellHovered =
-					hoveredCell?.rowIndex === rowIndex &&
-					hoveredCell?.columnName === column;
-				const width = getCellWidth(column);
+		return (
+			<div
+				key={`row-${rowIndex}`}
+				className={`flex w-fit border-b border-gray-100 ${
+					isSelected
+						? "bg-blue-100"
+						: rowIndex % 2 === 0
+							? "bg-white"
+							: "bg-gray-50/60"
+				}`}
+				onClick={() => handleRowSelect(row)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						handleRowSelect(row);
+					}
+				}}
+				aria-selected={isSelected}
+				style={{ cursor: "pointer" }}
+			>
+				{columns.map((column) => {
+					const cellValue = row[column];
+					const isJson =
+						typeof cellValue === "object" &&
+						cellValue !== null &&
+						!(cellValue instanceof Date);
 
-				// Special styling based on value type
-				const isNull = cellValue === null || cellValue === undefined;
+					const isPrimaryKey = primaryKeys.includes(column);
+					const width = getCellWidth(column);
 
-				return (
-					<div
-						key={`cell-${rowIndex}-${column}`}
-						className={`overflow-hidden relative transition-colors duration-150 ${
-							isCellHovered ? "bg-blue-50/80" : ""
-						}`}
-						style={{
-							width,
-							minWidth: width,
-							maxWidth: width,
-							borderRight: "1px solid rgba(224, 224, 224, 0.4)",
-						}}
-						onMouseEnter={() =>
-							setHoveredCell({ rowIndex, columnName: column })
-						}
-						onMouseLeave={() => setHoveredCell(null)}
-					>
-						<div className={`px-3 py-2.5 ${isPrimaryKey ? "font-medium" : ""}`}>
-							{isJson ? (
-								<JsonCell value={cellValue} />
-							) : (
-								<TooltipProvider>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												className={`p-0 h-auto w-full justify-start font-normal truncate text-left ${
-													isNull
-														? "text-gray-400 italic"
-														: isPrimaryKey
-															? "font-medium"
-															: ""
-												}`}
-												onClick={() => handleCopyCellContent(cellValue)}
-												aria-label={`Copy value: ${formatCellValue(cellValue)}`}
-											>
-												{isNull ? (
-													<span className="text-gray-400">NULL</span>
-												) : (
-													formatCellValue(cellValue)
-												)}
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>
-											<p>Click to copy</p>
-										</TooltipContent>
-									</Tooltip>
-								</TooltipProvider>
-							)}
-						</div>
+					// Special styling based on value type
+					const isNull = cellValue === null || cellValue === undefined;
 
-						{/* Cell action buttons */}
-						{isCellHovered && (
+					return (
+						<div
+							key={`cell-${rowIndex}-${column}`}
+							className="overflow-hidden relative transition-colors duration-150"
+							style={{
+								width,
+								minWidth: width,
+								maxWidth: width,
+								borderRight: "1px solid rgba(224, 224, 224, 0.4)",
+							}}
+						>
 							<div
-								className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/95 rounded-md shadow-md flex items-center p-0.5 border border-gray-100"
-								style={{ zIndex: 2 }}
+								className={`px-3 py-2.5 ${isPrimaryKey ? "font-medium" : ""}`}
 							>
-								{/* Copy button */}
-								<TooltipProvider>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="h-7 w-7 rounded-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-												onClick={() => handleCopyCellContent(cellValue)}
-											>
-												<FiCopy size={14} />
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent side="bottom">
-											<p>Copy to clipboard</p>
-										</TooltipContent>
-									</Tooltip>
-								</TooltipProvider>
-
-								{/* Edit button */}
-								<TooltipProvider>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className={cn(
-													"h-7 w-7 rounded-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50",
-													(!primaryKeys.length || !isEditableCell) &&
-														"opacity-50 cursor-not-allowed",
-												)}
-												onClick={() =>
-													isEditableCell && handleCellEdit(rowIndex, column)
-												}
-												disabled={!primaryKeys.length || !isEditableCell}
-											>
-												<FiEdit2 size={14} />
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent side="bottom">
-											<p>
-												{!primaryKeys.length
-													? "Editing not available: Table has no primary key"
-													: isEditableCell
-														? "Edit cell value"
-														: "Primary key cannot be edited"}
-											</p>
-										</TooltipContent>
-									</Tooltip>
-								</TooltipProvider>
+								{isJson ? (
+									<JsonCell value={cellValue} />
+								) : (
+									<TooltipProvider>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													className={`p-0 h-auto w-full justify-start font-normal truncate text-left ${
+														isNull
+															? "text-gray-400 italic"
+															: isPrimaryKey
+																? "font-medium"
+																: ""
+													}`}
+													onClick={() => handleCopyCellContent(cellValue)}
+													aria-label={`Copy value: ${formatCellValue(cellValue)}`}
+												>
+													{isNull ? (
+														<span className="text-gray-400">NULL</span>
+													) : (
+														formatCellValue(cellValue)
+													)}
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>
+												<p>Click to copy</p>
+											</TooltipContent>
+										</Tooltip>
+									</TooltipProvider>
+								)}
 							</div>
-						)}
-					</div>
-				);
-			})}
-		</div>
-	);
+						</div>
+					);
+				})}
+			</div>
+		);
+	};
 
 	// Render empty state
 	const renderEmptyState = () => (
@@ -730,21 +645,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						className="hover:bg-blue-100 rounded-full p-1 flex items-center justify-center"
 						aria-label={`Remove filter for ${column}`}
 					>
-						<svg
-							className="w-3 h-3"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-							xmlns="http://www.w3.org/2000/svg"
-							aria-hidden="true"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						</svg>
+						<FiX className="w-3 h-3" />
 					</button>
 				</div>
 			));
@@ -769,21 +670,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						className="hover:bg-purple-100 rounded-full p-1 flex items-center justify-center"
 						aria-label="Remove sort"
 					>
-						<svg
-							className="w-3 h-3"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-							xmlns="http://www.w3.org/2000/svg"
-							aria-hidden="true"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						</svg>
+						<FiX className="w-3 h-3" />
 					</button>
 				</div>
 			);
@@ -853,21 +740,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									aria-label="Previous page"
 									className="h-8 w-8"
 								>
-									<svg
-										className="w-5 h-5"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-										xmlns="http://www.w3.org/2000/svg"
-										aria-hidden="true"
-									>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth={2}
-											d="M15 19l-7-7 7-7"
-										/>
-									</svg>
+									<FiChevronLeft className="w-5 h-5" />
 								</Button>
 								<Button
 									variant="outline"
@@ -879,21 +752,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									aria-label="Next page"
 									className="h-8 w-8"
 								>
-									<svg
-										className="w-5 h-5"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-										xmlns="http://www.w3.org/2000/svg"
-										aria-hidden="true"
-									>
-										<path
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											strokeWidth={2}
-											d="M9 5l7 7-7 7"
-										/>
-									</svg>
+									<FiChevronRight className="w-5 h-5" />
 								</Button>
 							</div>
 						</div>
@@ -952,23 +811,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				currentFilter={filters[filterColumn]}
 				onApply={handleFilterApply}
 			/>
-
-			{/* Edit Cell Modal */}
-			{editingCell && (
-				<EditCellModal
-					open={!!editingCell}
-					onClose={handleCloseEditModal}
-					tableName={tableName}
-					columnName={editingCell.columnName}
-					value={editingCell.value}
-					primaryKeyColumn={editingCell.primaryKeyColumn}
-					primaryKeyValue={editingCell.primaryKeyValue}
-					filters={filters}
-					sortConfig={sortConfig}
-					pagination={pagination}
-					connectionId={connectionId}
-				/>
-			)}
 		</>
 	);
 };

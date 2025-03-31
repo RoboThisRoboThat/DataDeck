@@ -50,14 +50,14 @@ const TableTabs: React.FC<TableTabsProps> = ({
 	};
 
 	return (
-		<div className="flex items-center border-b border-border bg-muted/10">
+		<div className="flex items-center border-b border-border bg-muted/20">
 			{/* Left Scroll Button */}
 			{showScrollButtons.left && (
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={() => scrollTabs("left")}
-					className="flex-none p-0 h-9 w-9 rounded-none text-muted-foreground hover:bg-muted"
+					className="flex-none p-0 h-9 w-9 rounded-none text-foreground hover:bg-muted/50"
 				>
 					<IoChevronBack className="w-4 h-4" />
 				</Button>
@@ -74,11 +74,11 @@ const TableTabs: React.FC<TableTabsProps> = ({
 						key={table}
 						variant="ghost"
 						onClick={() => setActiveTable(table)}
-						className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm rounded-none transition-colors
+						className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm transition-colors mx-[1px]
               ${
 								activeTable === table
-									? "bg-background border-t-2 border-t-primary text-foreground font-medium"
-									: "text-muted-foreground hover:bg-muted/50"
+									? "bg-white dark:bg-slate-800 border-t-[3px] border-t-primary border-x border-x-border rounded-t-md border-b-0 text-foreground font-semibold shadow-md z-10"
+									: "text-muted-foreground hover:bg-muted/70 border-b border-border rounded-none"
 							}`}
 					>
 						<span className="max-w-[150px] truncate">{table}</span>
@@ -105,7 +105,7 @@ const TableTabs: React.FC<TableTabsProps> = ({
 					variant="ghost"
 					size="icon"
 					onClick={() => scrollTabs("right")}
-					className="flex-none p-0 h-9 w-9 rounded-none text-muted-foreground hover:bg-muted"
+					className="flex-none p-0 h-9 w-9 rounded-none text-foreground hover:bg-muted/50"
 				>
 					<IoChevronForward className="w-4 h-4" />
 				</Button>

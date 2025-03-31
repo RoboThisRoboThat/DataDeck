@@ -31,6 +31,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
+    "dayjs": "^1.11.13",
     "electron-store": "^10.0.1",
     "lucide-react": "^0.483.0",
     "monaco-editor": "^0.52.2",

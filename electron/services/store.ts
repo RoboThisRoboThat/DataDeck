@@ -607,4 +607,15 @@ export const storeService = {
 			throw error;
 		}
 	},
+
+	async addRow(
+		connectionId: string,
+		tableName: string,
+		data: Record<string, unknown>,
+	) {
+		const service = activeConnections.get(connectionId);
+		if (!service) throw new Error("No active connection with this ID");
+
+		return await service.addRow(tableName, data);
+	},
 };

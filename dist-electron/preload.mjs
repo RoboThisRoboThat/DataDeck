@@ -4,7 +4,10 @@ electron.contextBridge.exposeInMainWorld("electron", {
   ipcRenderer: {
     on(...args) {
       const [channel, listener] = args;
-      return electron.ipcRenderer.on(channel, (event, ...args2) => listener(event, ...args2));
+      return electron.ipcRenderer.on(
+        channel,
+        (event, ...args2) => listener(event, ...args2)
+      );
     },
     off(...args) {
       const [channel, ...omit] = args;
@@ -78,12 +81,36 @@ electron.contextBridge.exposeInMainWorld("database", {
   getDatabaseSchema: (id) => {
     console.log("[Preload] getDatabaseSchema with ID:", id);
     return electron.ipcRenderer.invoke("db:getDatabaseSchema", id);
+  },
+  getTableStructure: (connectionId, tableName) => {
+    return electron.ipcRenderer.invoke("db:getTableStructure", connectionId, tableName);
+  },
+  addRow: (connectionId, tableName, data) => {
+    console.log(
+      "[Preload] addRow with ID:",
+      connectionId,
+      "table:",
+      tableName,
+      "data:",
+      data
+    );
+    return electron.ipcRenderer.invoke("db:addRow", connectionId, tableName, data);
   }
 });
 electron.contextBridge.exposeInMainWorld("windowManager", {
   openConnectionWindow: (connectionId, connectionName, urlParams) => {
-    console.log("[Preload] opening new window for connection:", connectionId, connectionName, urlParams);
-    return electron.ipcRenderer.invoke("window:openConnectionWindow", connectionId, connectionName, urlParams);
+    console.log(
+      "[Preload] opening new window for connection:",
+      connectionId,
+      connectionName,
+      urlParams
+    );
+    return electron.ipcRenderer.invoke(
+      "window:openConnectionWindow",
+      connectionId,
+      connectionName,
+      urlParams
+    );
   },
   setMainWindowFullscreen: () => {
     console.log("[Preload] setting main window to fullscreen");

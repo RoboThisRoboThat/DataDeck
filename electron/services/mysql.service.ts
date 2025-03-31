@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 
 class MySQLService {
-	private connection: mysql.Connection | null = null;
+	connection: mysql.Connection | null = null;
 
 	async connect(config: {
 		host: string;
@@ -32,9 +32,13 @@ class MySQLService {
 	}
 
 	async disconnect() {
-		if (this.connection) {
-			await this.connection.end();
-			this.connection = null;
+		try {
+			if (this.connection) {
+				await this.connection.end();
+				this.connection = null;
+			}
+		} catch (error) {
+			console.error("Error disconnecting from MySQL:", error);
 		}
 	}
 
@@ -45,9 +49,42 @@ class MySQLService {
 			}
 
 			const [results] = await this.connection.execute(sql);
+			console.log("MySQL query results:", results[0]);
 			return results;
 		} catch (error) {
 			console.error("Error in query method:", error);
+
+			// Check if the error message includes "closed"
+			if (
+				error instanceof Error &&
+				error.message.toLowerCase().includes("closed")
+			) {
+				console.log("Connection closed, attempting to reconnect...");
+				try {
+					// Get the current connection config and reconnect
+					if (this.connection) {
+						const config = this.connection.config;
+						await this.disconnect();
+						await this.connect({
+							host: config.host as string,
+							port: String(config.port),
+							user: config.user as string,
+							password: config.password as string,
+							database: config.database as string,
+						});
+
+						// Try the query again
+						if (this.connection) {
+							const [results] = await this.connection.execute(sql);
+							return results;
+						}
+					}
+				} catch (reconnectError) {
+					console.error("Failed to reconnect and retry query:", reconnectError);
+					throw reconnectError;
+				}
+			}
+
 			throw error;
 		}
 	}
@@ -259,37 +296,39 @@ class MySQLService {
 
 			// Map MySQL data types to the simplified types required
 			return (columns as Array<{ COLUMN_NAME: string; DATA_TYPE: string }>).map(
-				(col) => {
-					const dataType = col.DATA_TYPE.toLowerCase();
-					let type: "json" | "string" | "number" | "boolean" = "string"; // Default to string
-
-					// Map MySQL types to our simplified types
-					if (dataType === "json" || dataType.includes("blob")) {
-						type = "json";
-					} else if (
-						dataType.includes("int") ||
-						dataType === "decimal" ||
-						dataType === "float" ||
-						dataType === "double" ||
-						dataType === "real"
-					) {
-						type = "number";
-					} else if (
-						dataType === "tinyint(1)" ||
-						dataType === "boolean" ||
-						dataType === "bool"
-					) {
-						type = "boolean";
-					}
-
-					return {
-						column: col.COLUMN_NAME,
-						type,
-					};
-				},
+				(col) => ({
+					column: col.COLUMN_NAME,
+					type: col.DATA_TYPE.toLowerCase(),
+				}),
 			);
 		} catch (error) {
 			console.error("Error getting MySQL table structure:", error);
+			throw error;
+		}
+	}
+
+	async addRow(
+		tableName: string,
+		data: Record<string, unknown>,
+	): Promise<boolean> {
+		if (!this.connection) throw new Error("No MySQL connection");
+		try {
+			// Extract column names and values
+			const columns = Object.keys(data);
+			const values = Object.values(data);
+
+			// Build the SQL query
+			const placeholders = columns.map(() => "?").join(", ");
+			const columnsList = columns.join(", ");
+
+			const sql = `INSERT INTO ${tableName} (${columnsList}) VALUES (${placeholders})`;
+			console.log("MySQL add row SQL:", sql);
+
+			await this.connection.execute(sql, values);
+			console.log("Row addition successful");
+			return true;
+		} catch (error) {
+			console.error("Error adding row:", error);
 			throw error;
 		}
 	}

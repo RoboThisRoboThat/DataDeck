@@ -297,9 +297,7 @@ ipcMain.handle("db:getActiveConnections", () => {
 
 // Database operation IPC handlers
 ipcMain.handle("db:query", async (_, connectionId, sql) => {
-	console.log("Main process: query operation with ID:", connectionId);
 	if (!connectionId) {
-		console.error("Main process: connection ID is undefined/empty for query");
 		throw new Error("Connection ID is required");
 	}
 	return await storeService.query(connectionId, sql);
@@ -378,6 +376,7 @@ ipcMain.handle(
 		newValue,
 	) => {
 		try {
+			console.log("Print the connection id here:=======>", connectionId);
 			const result = await storeService.updateCell(
 				connectionId,
 				tableName,
@@ -626,4 +625,16 @@ ipcMain.handle("debug:getAISettings", () => {
 			? `${settings.ai.claudeApiKey.substring(0, 3)}...${settings.ai.claudeApiKey.substring(settings.ai.claudeApiKey.length - 4)}`
 			: null,
 	};
+});
+
+ipcMain.handle("db:addRow", async (_, connectionId, tableName, data) => {
+	try {
+		console.log("IPC: Adding new row to table:", tableName, "data:", data);
+		const result = await storeService.addRow(connectionId, tableName, data);
+		console.log("IPC: Row addition result:", result);
+		return result;
+	} catch (error) {
+		console.error("IPC: Error adding new row:", error);
+		throw error;
+	}
 });

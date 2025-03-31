@@ -30,6 +30,7 @@ export interface TableState {
 		primaryKeyColumn: string;
 		primaryKeyValue: string | number;
 	} | null;
+	selectedRow: TableDataRow | null;
 }
 
 // Root state interface for tables
