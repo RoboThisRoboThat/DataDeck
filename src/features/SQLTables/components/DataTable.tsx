@@ -167,11 +167,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		connectionId,
 	]);
 
-	// Log when primary keys change
-	useEffect(() => {
-		console.log(`Primary keys for table ${tableName}:`, primaryKeys);
-	}, [primaryKeys, tableName]);
-
 	// Handle column menu close
 	const handleColumnMenuClose = () => {
 		// No longer using anchorEl so this is simplified
@@ -915,10 +910,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 	return (
 		<>
-			<div
-				style={{ width: "calc(100vw - 256px)" }}
-				className="h-full flex flex-col overflow-hidden border border-gray-200 rounded-md relative"
-			>
+			<div className="h-full flex flex-col overflow-hidden border border-gray-200 rounded-md relative">
 				{/* Show loading indicator at the top when loading */}
 				{loading && (
 					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200">

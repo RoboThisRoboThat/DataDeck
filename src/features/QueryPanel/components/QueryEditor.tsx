@@ -15,7 +15,6 @@ interface QueryEditorProps {
 	isExecuting: boolean;
 	onSelectionChange?: (selectedText: string) => void;
 	connectionId: string;
-	tables?: string[];
 }
 
 // SQL keywords for auto-completion
@@ -134,7 +133,6 @@ const QueryEditor = forwardRef<EditorRefType, QueryEditorProps>(
 			isExecuting,
 			onSelectionChange,
 			connectionId,
-			tables,
 		},
 		ref,
 	) => {
@@ -147,245 +145,28 @@ const QueryEditor = forwardRef<EditorRefType, QueryEditorProps>(
 			null,
 		);
 
-		// Fetch database schema information
+		// Fetch the schema when the component mounts
 		useEffect(() => {
-			if (!connectionId) return;
-
-			const fetchDatabaseSchema = async () => {
+			const fetchSchema = async () => {
 				try {
-					console.log("Fetching database schema for connection:", connectionId);
-
-					// If tables were passed as props, use them to build schema immediately
-					if (tables && tables.length > 0) {
-						console.log("Using tables passed from parent:", tables);
-
-						// Create basic schemas from the table names
-						const tablesWithColumns: TableSchema[] = tables.map(
-							(tableName) => ({
-								name: tableName,
-								columns: [
-									{ name: "id", type: "INT", table: tableName },
-									{ name: "created_at", type: "DATETIME", table: tableName },
-									{ name: "updated_at", type: "DATETIME", table: tableName },
-								],
-							}),
-						);
-
-						// Set the tables with default columns
-						setTableSchemas(tablesWithColumns);
-
-						// Try to fetch actual columns for each table
-						for (const tableSchema of tablesWithColumns) {
-							try {
-								const tableName = tableSchema.name;
-								const columnResult = await window.electron.ipcRenderer.invoke(
-									"execute-query",
-									{
-										connectionId,
-										sql: `DESCRIBE ${tableName}`,
-									},
-								);
-
-								if (columnResult && !columnResult.error && columnResult.data) {
-									const columns: ColumnSchema[] = [];
-
-									for (const col of columnResult.data) {
-										// Column naming can be Field, column_name, name, etc. depending on DB
-										const colName =
-											col.Field ||
-											col.column_name ||
-											col.name ||
-											Object.values(col)[0];
-										const colType =
-											col.Type || col.data_type || col.type || "UNKNOWN";
-
-										if (colName) {
-											columns.push({
-												name: colName,
-												type: colType,
-												table: tableName,
-											});
-										}
-									}
-
-									if (columns.length > 0) {
-										// Update this specific table's columns
-										setTableSchemas((prevSchemas) => {
-											const updatedSchemas = [...prevSchemas];
-											const tableIndex = updatedSchemas.findIndex(
-												(t) => t.name === tableName,
-											);
-											if (tableIndex >= 0) {
-												updatedSchemas[tableIndex].columns = columns;
-											}
-											return updatedSchemas;
-										});
-									}
-								}
-							} catch (err) {
-								console.error(
-									`Error fetching columns for ${tableSchema.name}:`,
-									err,
-								);
-							}
-						}
-
-						return; // Skip the rest of the schema fetching
-					}
-
-					// Hard-code common tables for testing if needed
-					const mockTables = [
-						{
-							name: "users",
-							columns: [
-								{ name: "id", type: "INT", table: "users" },
-								{ name: "username", type: "VARCHAR", table: "users" },
-								{ name: "email", type: "VARCHAR", table: "users" },
-								{ name: "created_at", type: "DATETIME", table: "users" },
-							],
-						},
-						{
-							name: "posts",
-							columns: [
-								{ name: "id", type: "INT", table: "posts" },
-								{ name: "title", type: "VARCHAR", table: "posts" },
-								{ name: "content", type: "TEXT", table: "posts" },
-								{ name: "user_id", type: "INT", table: "posts" },
-								{ name: "created_at", type: "DATETIME", table: "posts" },
-							],
-						},
-						{
-							name: "comments",
-							columns: [
-								{ name: "id", type: "INT", table: "comments" },
-								{ name: "post_id", type: "INT", table: "comments" },
-								{ name: "user_id", type: "INT", table: "comments" },
-								{ name: "comment", type: "TEXT", table: "comments" },
-								{ name: "created_at", type: "DATETIME", table: "comments" },
-							],
-						},
-					];
-
-					// Set mock tables for immediate suggestions even while real tables load
-					setTableSchemas(mockTables);
-
-					// Attempt to get actual tables
-					try {
-						// Use the IPC call to get tables
-						const result = await window.electron.ipcRenderer.invoke(
-							"execute-query",
-							{
-								connectionId,
-								sql: "SHOW TABLES",
-							},
-						);
-
-						console.log("Query result for tables:", result);
-
-						if (result && !result.error && result.data) {
-							const actualTables: TableSchema[] = [];
-
-							// Process the tables
-							for (const row of result.data) {
-								// Extract table name from the result (format varies by DB)
-								const tableName = Object.values(row)[0] as string;
-
-								if (tableName) {
-									// Add default columns for now
-									actualTables.push({
-										name: tableName,
-										columns: [
-											{ name: "id", type: "INT", table: tableName },
-											{
-												name: "created_at",
-												type: "DATETIME",
-												table: tableName,
-											},
-											{
-												name: "updated_at",
-												type: "DATETIME",
-												table: tableName,
-											},
-										],
-									});
-
-									// Try to get actual columns for this table
-									try {
-										const columnResult =
-											await window.electron.ipcRenderer.invoke(
-												"execute-query",
-												{
-													connectionId,
-													sql: `DESCRIBE ${tableName}`,
-												},
-											);
-
-										console.log(
-											`Column result for ${tableName}:`,
-											columnResult,
-										);
-
-										if (
-											columnResult &&
-											!columnResult.error &&
-											columnResult.data
-										) {
-											const columns: ColumnSchema[] = [];
-
-											for (const col of columnResult.data) {
-												// Column naming can be Field, column_name, name, etc. depending on DB
-												const colName =
-													col.Field ||
-													col.column_name ||
-													col.name ||
-													Object.values(col)[0];
-												const colType =
-													col.Type || col.data_type || col.type || "UNKNOWN";
-
-												if (colName) {
-													columns.push({
-														name: colName,
-														type: colType,
-														table: tableName,
-													});
-												}
-											}
-
-											if (columns.length > 0) {
-												// Replace the default columns with actual ones
-												const tableIndex = actualTables.findIndex(
-													(t) => t.name === tableName,
-												);
-												if (tableIndex >= 0) {
-													actualTables[tableIndex].columns = columns;
-												}
-											}
-										}
-									} catch (err) {
-										console.error(
-											`Error fetching columns for ${tableName}:`,
-											err,
-										);
-									}
-								}
-							}
-
-							if (actualTables.length > 0) {
-								setTableSchemas(actualTables);
-								console.log("Schema loaded with actual tables:", actualTables);
-							}
-						}
-					} catch (err) {
-						console.error("Error fetching actual tables:", err);
-						// Keep using mock tables if real ones fail
-					}
-				} catch (err) {
-					console.error("Error in fetchDatabaseSchema:", err);
+					const schema = await window.database.getDatabaseSchema(connectionId);
+					// Map the schema from the database to match our component's expected interface
+					const mappedSchema = schema.map((table) => ({
+						name: table.name,
+						columns: table.columns.map((column) => ({
+							name: column.name,
+							type: column.type,
+							table: table.name, // Add the required table property
+						})),
+					}));
+					setTableSchemas(mappedSchema);
+				} catch (error) {
+					console.error("Error fetching schema:", error);
 				}
 			};
 
-			fetchDatabaseSchema();
-		}, [connectionId, tables]);
+			fetchSchema();
+		}, [connectionId]);
 
 		// Register SQL language support when Monaco instance is available
 		useEffect(() => {

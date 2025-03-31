@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { FiZap, FiSend, FiAlertCircle, FiArrowRight } from "react-icons/fi";
+import {
+	FiSend,
+	FiAlertCircle,
+	FiArrowRight,
+	FiDatabase,
+	FiRefreshCw,
+} from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +17,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 interface Message {
 	id: string;
@@ -27,6 +34,25 @@ interface ModelOption {
 	provider: "gpt" | "claude";
 }
 
+// Define types for database schema
+interface TableSchema {
+	name: string;
+	columns: Array<{
+		name: string;
+		type: string;
+		length?: number;
+		precision?: number;
+		isPrimary: boolean;
+		isNullable: boolean;
+		defaultValue?: string;
+	}>;
+	foreignKeys: Array<{
+		column: string;
+		referencedTable: string;
+		referencedColumn: string;
+	}>;
+}
+
 const AVAILABLE_MODELS: ModelOption[] = [
 	// OpenAI models
 	{ id: "gpt-4o", name: "GPT-4o", provider: "gpt" },
@@ -41,7 +67,11 @@ const AVAILABLE_MODELS: ModelOption[] = [
 	{ id: "claude-2", name: "Claude 2", provider: "claude" },
 ];
 
-const AIQueries = () => {
+interface AIQueriesProps {
+	connectionId: string;
+}
+
+const AIQueries = ({ connectionId }: AIQueriesProps) => {
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [inputValue, setInputValue] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
@@ -55,6 +85,8 @@ const AIQueries = () => {
 		claude: null,
 	});
 	const [error, setError] = useState<string | null>(null);
+	const [tableSchemas, setTableSchemas] = useState<TableSchema[]>([]);
+	const [loadingSchema, setLoadingSchema] = useState(true);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const { settings, isLoading: settingsLoading } = useSettings();
@@ -63,6 +95,33 @@ const AIQueries = () => {
 	const availableModels = AVAILABLE_MODELS.filter(
 		(model) => model.provider === activeProvider,
 	);
+
+	// Load database schema
+	// Fetch the schema when the component mounts
+	useEffect(() => {
+		const fetchSchema = async () => {
+			try {
+				const schema = await window.database.getDatabaseSchema(connectionId);
+				// Map the schema from the database to match our component's expected interface
+				const mappedSchema = schema.map((table) => ({
+					name: table.name,
+					columns: table.columns.map((column) => ({
+						name: column.name,
+						type: column.type,
+						table: table.name, // Add the required table property
+					})),
+					foreignKeys: table.foreignKeys || [], // Add the required foreignKeys property
+				}));
+				setTableSchemas(mappedSchema);
+				setLoadingSchema(false);
+			} catch (error) {
+				console.error("Error fetching schema:", error);
+				setLoadingSchema(false);
+			}
+		};
+
+		fetchSchema();
+	}, [connectionId]);
 
 	// Load API keys from settings context
 	useEffect(() => {
@@ -123,6 +182,34 @@ const AIQueries = () => {
 		}
 	};
 
+	// Create a formatted database schema for AI prompt context
+	const formatSchemaForAI = (): string => {
+		if (!tableSchemas || tableSchemas.length === 0)
+			return "No database schema available.";
+
+		let formattedSchema = "DATABASE SCHEMA:\n";
+
+		for (const table of tableSchemas) {
+			formattedSchema += `\nTABLE: ${table.name}\n`;
+
+			// Add columns
+			formattedSchema += "COLUMNS:\n";
+			for (const column of table.columns) {
+				formattedSchema += `- ${column.name} (${column.type}${column.length ? `(${column.length})` : ""})${column.isPrimary ? " PRIMARY KEY" : ""}${column.isNullable ? "" : " NOT NULL"}${column.defaultValue ? ` DEFAULT ${column.defaultValue}` : ""}\n`;
+			}
+
+			// Add foreign keys if present
+			if (table.foreignKeys.length > 0) {
+				formattedSchema += "FOREIGN KEYS:\n";
+				for (const fk of table.foreignKeys) {
+					formattedSchema += `- ${fk.column} → ${fk.referencedTable}.${fk.referencedColumn}\n`;
+				}
+			}
+		}
+
+		return formattedSchema;
+	};
+
 	const sendMessage = async () => {
 		if (!inputValue.trim()) return;
 
@@ -162,16 +249,18 @@ const AIQueries = () => {
 		setIsLoading(true);
 
 		try {
-			// First, check which model/service to use
-			// We'll mimic AI behavior with a local function
-			// In a real implementation, you would call the OpenAI or Anthropic APIs here
-			// Using the Vercel AI SDK with the correct API key configuration
+			// Prepare the database schema context
+			const schemaContext = formatSchemaForAI();
+
+			// In a real implementation, we would send the schemaContext along with the user query to the AI API
+			// For now, we're using a mock implementation that simulates AI responses
 
 			// Simulate network delay - remove in production with actual API calls
 			await new Promise((resolve) => setTimeout(resolve, 1500));
 
 			// Example response format that would come from the actual AI service
-			const response = generateSampleSQLResponse(inputValue);
+			// TODO: Replace with actual API calls to OpenAI or Anthropic
+			const response = generateSampleSQLResponse(inputValue, schemaContext);
 
 			// Update the pending message with the response
 			setMessages((prev) =>
@@ -211,25 +300,48 @@ const AIQueries = () => {
 
 	// This is just a placeholder function to generate example responses
 	// In a real app, this would be an API call to OpenAI/Anthropic
-	const generateSampleSQLResponse = (query: string): string => {
-		// Simple pattern matching to generate sample responses
+	const generateSampleSQLResponse = (
+		query: string,
+		schemaContext: string,
+	): string => {
+		// Note: This is a simplified mock function. In production, you would:
+		// 1. Send the user query + schema context to the OpenAI/Claude API
+		// 2. Process the response and return it
+
+		// For now, we'll continue with pattern matching for demo purposes
 		let sqlQuery = "";
+
+		// Check if we have schema information to use in the responses
+		const hasSchema = tableSchemas && tableSchemas.length > 0;
+
+		// Look for table names in the schema to make the examples more realistic
+		const userTableName = hasSchema
+			? tableSchemas.find((t) => t.name.toLowerCase().includes("user"))?.name ||
+				"users"
+			: "users";
+
+		const orderTableName = hasSchema
+			? tableSchemas.find((t) => t.name.toLowerCase().includes("order"))
+					?.name || "orders"
+			: "orders";
+
+		const productTableName = hasSchema
+			? tableSchemas.find((t) => t.name.toLowerCase().includes("product"))
+					?.name || "products"
+			: "products";
 
 		if (
 			query.toLowerCase().includes("user") &&
 			query.toLowerCase().includes("last week")
 		) {
 			sqlQuery = `
-Here's a SQL query to find users who signed up in the last week:
+Based on your database schema, here's a SQL query to find users who signed up in the last week:
 
 \`\`\`sql
 SELECT 
-  user_id, 
-  username, 
-  email, 
-  created_at
+  *
 FROM 
-  users
+  ${userTableName}
 WHERE 
   created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
 ORDER BY 
@@ -242,74 +354,45 @@ This query selects user information for all users where the creation date is wit
 			query.toLowerCase().includes("greater than")
 		) {
 			sqlQuery = `
-Here's a SQL query to find orders with a total value greater than $100:
+Based on your database schema, here's a SQL query to find orders with a total value greater than $100:
 
 \`\`\`sql
 SELECT 
-  o.order_id, 
-  o.customer_id, 
-  c.customer_name,
-  o.order_date, 
-  SUM(oi.quantity * oi.unit_price) as total_value
+  o.*
 FROM 
-  orders o
-JOIN 
-  order_items oi ON o.order_id = oi.order_id
-JOIN 
-  customers c ON o.customer_id = c.customer_id
-GROUP BY 
-  o.order_id, o.customer_id, c.customer_name, o.order_date
-HAVING 
-  total_value > 100
+  ${orderTableName} o
+WHERE 
+  o.total_amount > 100
 ORDER BY 
-  total_value DESC;
+  o.total_amount DESC;
 \`\`\`
 
-This query joins the orders, order_items, and customers tables to calculate the total value of each order and returns only those with a value greater than $100.`;
+This query finds all orders with a total amount greater than $100, ordered by the total amount in descending order.`;
 		} else if (
 			query.toLowerCase().includes("top") &&
 			query.toLowerCase().includes("product")
 		) {
 			sqlQuery = `
-Here's a SQL query to get the top 10 products by quantity sold:
+Based on your database schema, here's a SQL query to get the top 10 products:
 
 \`\`\`sql
 SELECT 
-  p.product_id, 
-  p.product_name, 
-  SUM(oi.quantity) as total_quantity_sold
+  *
 FROM 
-  products p
-JOIN 
-  order_items oi ON p.product_id = oi.product_id
-GROUP BY 
-  p.product_id, p.product_name
+  ${productTableName}
 ORDER BY 
-  total_quantity_sold DESC
+  popularity DESC
 LIMIT 10;
 \`\`\`
 
-This query joins the products and order_items tables to calculate the total quantity sold for each product, then returns the top 10 products ordered by the total quantity sold.`;
+This query returns the top 10 products ordered by popularity.`;
 		} else {
 			sqlQuery = `
-I'll help you create a SQL query based on your request. Here's a general query structure:
+I've analyzed your database schema and can help you create a SQL query based on your request. Here's a general outline of your schema:
 
-\`\`\`sql
-SELECT 
-  column1, 
-  column2,
-  column3
-FROM 
-  table_name
-WHERE 
-  condition
-GROUP BY
-  column1
-ORDER BY
-  column2;
-\`\`\`
+${schemaContext.length > 300 ? `${schemaContext.substring(0, 300)}...\n(schema truncated for readability)` : schemaContext}
 
-To make this query more specific to your needs, please provide more details about what data you're looking for and the structure of your database tables.`;
+Please provide more details about what specific data you're looking for, and I'll generate a targeted SQL query for your database structure.`;
 		}
 
 		return sqlQuery;
@@ -323,15 +406,17 @@ To make this query more specific to your needs, please provide more details abou
 		setTimeout(() => setError(temp), 2000);
 	};
 
-	// Show loading state
-	if (settingsLoading) {
+	// Show loading state when fetching settings or schema
+	if (settingsLoading || loadingSchema) {
 		return (
 			<div className="flex flex-col h-full overflow-hidden">
 				<div className="flex-grow overflow-y-auto p-4">
 					<div className="flex flex-col items-center justify-center h-full text-center">
-						<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+						<Loader2 className="h-8 w-8 animate-spin text-primary" />
 						<p className="text-sm text-muted-foreground mt-4">
-							Loading settings...
+							{loadingSchema
+								? "Loading database schema..."
+								: "Loading settings..."}
 						</p>
 					</div>
 				</div>

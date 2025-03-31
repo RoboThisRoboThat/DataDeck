@@ -195,7 +195,10 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							/>
 
 							{/* Table Content */}
-							<div className="flex-1 overflow-hidden">
+							<div
+								style={{ width: "calc(100vw - 256px)" }}
+								className="flex-1 overflow-hidden"
+							>
 								{activeTable ? (
 									<div className="flex-1 h-full flex flex-col">
 										{/* Data Table */}
@@ -207,8 +210,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 										</div>
 									</div>
 								) : (
-									<div className="h-full flex items-center justify-center text-muted-foreground">
-										<div className="text-center">
+									<div className="h-full flex items-center justify-center text-muted-foreground mx-auto w-full">
+										<div className="text-center w-fit">
 											<p className="text-lg">
 												Select a table from the sidebar to view its data
 											</p>
