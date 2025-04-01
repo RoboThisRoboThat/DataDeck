@@ -6,6 +6,7 @@ import {
 	FiSave,
 	FiSearch,
 	FiCopy,
+	FiMoreVertical,
 } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	fetchTableData,
 	setSelectedRow,
@@ -527,48 +534,43 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					<h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
 						Row Details
 					</h2>
-
-					<div className="flex gap-2">
-						{activeTable && hasSelectedRowData && (
-							<Button
-								variant="outline"
-								size="sm"
-								className="w-9 h-9 p-0 rounded-full text-purple-600 border-purple-200"
-								onClick={() => setShowCopyRowModal(true)}
-								title="Duplicate Row"
-							>
-								<FiCopy className="text-purple-500" size={16} />
-							</Button>
-						)}
-
-						{activeTable && hasSelectedRowData && primaryKeys.length > 0 && (
-							<Button
-								variant="default"
-								size="sm"
-								className="w-9 h-9 p-0 rounded-full text-white"
-								onClick={handleSaveClick}
-								disabled={!hasChanges() || loading}
-								title={loading ? "Saving..." : "Save"}
-							>
-								<FiSave className="text-indigo-700" size={16} />
-							</Button>
-						)}
-					</div>
 				</div>
 
-				{/* Search input */}
-				<div className="relative">
-					<FiSearch
-						className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-						size={14}
-					/>
-					<Input
-						type="text"
-						placeholder="Search columns..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="pl-9 text-sm"
-					/>
+				{/* Search input with three dots menu */}
+				<div className="relative flex items-center gap-2">
+					<div className="relative flex-1">
+						<FiSearch
+							className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+							size={14}
+						/>
+						<Input
+							type="text"
+							placeholder="Search columns..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9 text-sm"
+						/>
+					</div>
+
+					{activeTable && hasSelectedRowData && (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button
+									variant="outline"
+									size="sm"
+									className="w-9 h-9 p-0 rounded-full"
+								>
+									<FiMoreVertical className="text-gray-500" size={16} />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end">
+								<DropdownMenuItem onClick={() => setShowCopyRowModal(true)}>
+									<FiCopy className="mr-2 text-purple-500" size={16} />
+									Duplicate Row
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					)}
 				</div>
 			</div>
 
@@ -589,79 +591,110 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			)}
 
 			{activeTable && hasSelectedRowData && (
-				<div className="flex-1 p-4 overflow-auto">
-					<div className="space-y-3">
-						{filteredColumns.map((column) => {
-							const value = selectedRow[column];
-							const isNull = isValueNull(column);
-							const canEdit = !isPrimaryKey(column);
-							const truncatedColumnName = truncateColumnName(column);
-							const inputType = getInputType(column);
-							const columnType = getColumnType(column);
+				<>
+					<div className="flex-1 p-4 overflow-auto">
+						<div className="space-y-3">
+							{filteredColumns.map((column) => {
+								const value = selectedRow[column];
+								const isNull = isValueNull(column);
+								const canEdit = !isPrimaryKey(column);
+								const truncatedColumnName = truncateColumnName(column);
+								const inputType = getInputType(column);
+								const columnType = getColumnType(column);
 
-							return (
-								<div
-									key={column}
-									className="space-y-1 pb-2 border-b border-gray-100 mb-2"
-								>
-									<div className="flex justify-between items-center">
-										<label
-											htmlFor={`field-${column}`}
-											className="text-xs font-medium text-gray-700"
-											title={column} // Show full column name on hover
-										>
-											{truncatedColumnName}
-											{isPrimaryKey(column) && (
-												<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
-													PK
+								return (
+									<div
+										key={column}
+										className="space-y-1 pb-2 border-b border-gray-100 mb-2"
+									>
+										<div className="flex justify-between items-center">
+											<label
+												htmlFor={`field-${column}`}
+												className="text-xs font-medium text-gray-700"
+												title={column} // Show full column name on hover
+											>
+												{truncatedColumnName}
+												{isPrimaryKey(column) && (
+													<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
+														PK
+													</span>
+												)}
+												<span className="ml-1 text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">
+													({columnType || "N/A"})
 												</span>
-											)}
-											<span className="ml-1 text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">
-												({columnType || "N/A"})
-											</span>
-										</label>
-									</div>
+											</label>
+										</div>
 
-									{isNull ? (
-										<div className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-md text-sm text-gray-400 italic">
-											NULL
-										</div>
-									) : inputType === "json" ? (
-										<div className="h-36 border border-blue-300 rounded-md overflow-hidden">
-											<Editor
-												height="100%"
-												language="json"
-												value={
-													column in editedValues &&
-													editedValues[column] !== null
-														? (editedValues[column] as string)
-														: formatValue(value)
-												}
-												onChange={(value) => handleMonacoChange(column, value)}
-												options={{
-													minimap: { enabled: false },
-													lineNumbers: "on",
-													fontSize: 12,
-													scrollBeyondLastLine: false,
-													automaticLayout: true,
-													wordWrap: "on",
-													readOnly: !canEdit,
-												}}
-												onMount={handleEditorDidMount}
-												theme="vs"
-											/>
-										</div>
-									) : inputType === "date" || inputType === "datetime-local" ? (
-										<div className="relative">
+										{isNull ? (
+											<div className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-md text-sm text-gray-400 italic">
+												NULL
+											</div>
+										) : inputType === "json" ? (
+											<div className="h-36 border border-blue-300 rounded-md overflow-hidden">
+												<Editor
+													height="100%"
+													language="json"
+													value={
+														column in editedValues &&
+														editedValues[column] !== null
+															? (editedValues[column] as string)
+															: formatValue(value)
+													}
+													onChange={(value) =>
+														handleMonacoChange(column, value)
+													}
+													options={{
+														minimap: { enabled: false },
+														lineNumbers: "on",
+														fontSize: 12,
+														scrollBeyondLastLine: false,
+														automaticLayout: true,
+														wordWrap: "on",
+														readOnly: !canEdit,
+													}}
+													onMount={handleEditorDidMount}
+													theme="vs"
+												/>
+											</div>
+										) : inputType === "date" ||
+											inputType === "datetime-local" ? (
+											<div className="relative">
+												<input
+													id={`field-${column}`}
+													type={inputType}
+													readOnly={!canEdit}
+													value={
+														column in editedValues &&
+														editedValues[column] !== null
+															? (editedValues[column] as string)
+															: formatDateForInput(value, inputType)
+													}
+													onChange={
+														canEdit
+															? (e) => handleInputChange(column, e.target.value)
+															: undefined
+													}
+													className={`w-full px-3 py-2 border rounded-md text-sm
+														${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 bg-orange-50" : ""}
+													`}
+												/>
+												{!isValidDate(value) && !(column in editedValues) && (
+													<div className="text-xs text-orange-600 mt-1">
+														Invalid date format. Edit to fix.
+													</div>
+												)}
+											</div>
+										) : inputType === "number" ? (
 											<input
 												id={`field-${column}`}
-												type={inputType}
+												type="number"
 												readOnly={!canEdit}
 												value={
 													column in editedValues &&
 													editedValues[column] !== null
 														? (editedValues[column] as string)
-														: formatDateForInput(value, inputType)
+														: formatValue(value)
 												}
 												onChange={
 													canEdit
@@ -670,59 +703,50 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 												}
 												className={`w-full px-3 py-2 border rounded-md text-sm
 													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-													${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 bg-orange-50" : ""}
 												`}
 											/>
-											{!isValidDate(value) && !(column in editedValues) && (
-												<div className="text-xs text-orange-600 mt-1">
-													Invalid date format. Edit to fix.
-												</div>
-											)}
-										</div>
-									) : inputType === "number" ? (
-										<input
-											id={`field-${column}`}
-											type="number"
-											readOnly={!canEdit}
-											value={
-												column in editedValues && editedValues[column] !== null
-													? (editedValues[column] as string)
-													: formatValue(value)
-											}
-											onChange={
-												canEdit
-													? (e) => handleInputChange(column, e.target.value)
-													: undefined
-											}
-											className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-											`}
-										/>
-									) : (
-										<input
-											id={`field-${column}`}
-											type="text"
-											readOnly={!canEdit}
-											value={
-												column in editedValues && editedValues[column] !== null
-													? (editedValues[column] as string)
-													: formatValue(value)
-											}
-											onChange={
-												canEdit
-													? (e) => handleInputChange(column, e.target.value)
-													: undefined
-											}
-											className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-											`}
-										/>
-									)}
-								</div>
-							);
-						})}
+										) : (
+											<input
+												id={`field-${column}`}
+												type="text"
+												readOnly={!canEdit}
+												value={
+													column in editedValues &&
+													editedValues[column] !== null
+														? (editedValues[column] as string)
+														: formatValue(value)
+												}
+												onChange={
+													canEdit
+														? (e) => handleInputChange(column, e.target.value)
+														: undefined
+												}
+												className={`w-full px-3 py-2 border rounded-md text-sm
+													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+												`}
+											/>
+										)}
+									</div>
+								);
+							})}
+						</div>
 					</div>
-				</div>
+
+					{/* Fixed save button at the bottom */}
+					{primaryKeys.length > 0 && (
+						<div className="sticky bottom-0 p-3 bg-gray-50 border-t border-gray-200 flex justify-center">
+							<Button
+								variant="default"
+								className="w-full"
+								onClick={handleSaveClick}
+								disabled={!hasChanges() || loading}
+							>
+								<FiSave className="mr-2" size={16} />
+								{loading ? "Saving..." : "Save Changes"}
+							</Button>
+						</div>
+					)}
+				</>
 			)}
 
 			{/* Confirmation Dialog */}
