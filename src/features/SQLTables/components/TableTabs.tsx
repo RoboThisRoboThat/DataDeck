@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import type React from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { IoChevronBack, IoChevronForward, IoClose } from "react-icons/io5";
 import { Button } from "../../../components/ui/button";
 
@@ -32,6 +33,68 @@ const TableTabs: React.FC<TableTabsProps> = ({
 			});
 		}
 	}, []);
+
+	// Function to navigate to the next or previous tab
+	const navigateTabs = useCallback(
+		(direction: "next" | "prev") => {
+			if (!tables.length || !activeTable) return;
+
+			const currentIndex = tables.indexOf(activeTable);
+			if (currentIndex === -1) return;
+
+			let nextIndex: number;
+			if (direction === "next") {
+				nextIndex = currentIndex === tables.length - 1 ? 0 : currentIndex + 1;
+			} else {
+				nextIndex = currentIndex === 0 ? tables.length - 1 : currentIndex - 1;
+			}
+
+			setActiveTable(tables[nextIndex]);
+
+			// Ensure the newly activated tab is visible by scrolling to it
+			setTimeout(() => {
+				const tabsContainer = tabsRef.current;
+				const tabElements = tabsContainer?.querySelectorAll("button");
+				if (tabsContainer && tabElements && tabElements[nextIndex]) {
+					const tabElement = tabElements[nextIndex];
+					const containerRect = tabsContainer.getBoundingClientRect();
+					const tabRect = tabElement.getBoundingClientRect();
+
+					// Check if the tab is not fully visible
+					if (
+						tabRect.left < containerRect.left ||
+						tabRect.right > containerRect.right
+					) {
+						tabElement.scrollIntoView({
+							behavior: "smooth",
+							block: "nearest",
+							inline: "nearest",
+						});
+					}
+				}
+			}, 10);
+		},
+		[activeTable, tables, setActiveTable],
+	);
+
+	// Add keyboard shortcuts
+	useHotkeys(
+		"cmd+option+right, ctrl+alt+right",
+		(event) => {
+			event.preventDefault();
+			navigateTabs("next");
+		},
+		{ enableOnFormTags: true },
+	);
+
+	useHotkeys(
+		"cmd+option+left, ctrl+alt+left",
+		(event) => {
+			event.preventDefault();
+			navigateTabs("prev");
+		},
+		{ enableOnFormTags: true },
+	);
 
 	// Add scroll event listener
 	useEffect(() => {

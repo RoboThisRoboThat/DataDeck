@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import TableList from "./components/TableList";
 import TableTabs from "./components/TableTabs";
 import DataTable from "./components/DataTable";
@@ -30,6 +31,9 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 	// Store connectionId in a ref to ensure we can access it in async callbacks
 	const connectionIdRef = useRef(connectionId);
 
+	// Ref for the TableList search input
+	const searchInputRef = useRef<HTMLInputElement>(null);
+
 	// Update ref when prop changes
 	useEffect(() => {
 		connectionIdRef.current = connectionId;
@@ -52,6 +56,16 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 		}
 		loadTables(connectionId);
 	}, [connectionId]);
+
+	// Hotkey to focus the sidebar search input
+	useHotkeys(
+		"mod+shift+f",
+		(event) => {
+			event.preventDefault(); // Prevent browser find
+			searchInputRef.current?.focus();
+		},
+		{ enableOnFormTags: true },
+	); // Enable even when focus is on input/textarea etc.
 
 	const loadTables = async (connectionId: string) => {
 		try {
@@ -108,12 +122,6 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 		}
 	};
 
-	const handleKeyDown = (event: React.KeyboardEvent, table: string) => {
-		if (event.key === "Enter" || event.key === " ") {
-			handleTableSelect(table);
-		}
-	};
-
 	return (
 		<div className="flex flex-col h-full w-full">
 			<Tabs
@@ -155,13 +163,13 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 					>
 						{/* Left Sidebar to show table listing */}
 						<TableList
+							ref={searchInputRef}
 							tables={allTables}
 							openTables={tables}
 							activeTable={activeTable}
 							tableSearch={tableSearch}
 							setTableSearch={setTableSearch}
 							handleTableSelect={handleTableSelect}
-							handleKeyDown={handleKeyDown}
 						/>
 
 						{/* Main content to show table data */}

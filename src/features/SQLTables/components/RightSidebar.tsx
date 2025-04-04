@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
 	FiDatabase,
@@ -37,6 +38,8 @@ interface RightSidebarProps {
 
 function RightSidebar({ connectionId }: RightSidebarProps) {
 	const dispatch = useAppDispatch();
+	const sidebarRef = useRef<HTMLDivElement>(null);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	// Get the active table name from Redux
 	const activeTable = useAppSelector((state) => state.tables.activeTable);
@@ -410,12 +413,6 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		}
 	};
 
-	// Handle Monaco editor initialization
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const handleEditorDidMount = (_editor: unknown, _monaco: Monaco) => {
-		// We may use this in the future for customizing the editor
-	};
-
 	// Render the changes for confirmation
 	const renderChanges = () => {
 		return Object.entries(editedValues)
@@ -527,8 +524,128 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		return false;
 	};
 
+	// Function to navigate between input fields in the sidebar
+	const navigateInputs = useCallback((direction: "up" | "down") => {
+		if (!sidebarRef.current) return;
+
+		// Get all focusable elements in the sidebar
+		const focusableElements = Array.from(
+			sidebarRef.current.querySelectorAll(
+				"button, [href], input, select, textarea",
+			),
+		) as HTMLElement[];
+
+		// Filter out disabled elements
+		const enabledElements = focusableElements.filter(
+			(el) =>
+				!el.hasAttribute("disabled") && el.getAttribute("tabindex") !== "-1",
+		);
+
+		if (enabledElements.length === 0) return;
+
+		// Get the currently focused element
+		const currentIndex = enabledElements.findIndex(
+			(el) => el === document.activeElement,
+		);
+
+		let newIndex: number;
+		if (currentIndex < 0) {
+			// If no element is focused, focus the first one
+			newIndex = 0;
+		} else if (direction === "down") {
+			// Move to the next element
+			newIndex = (currentIndex + 1) % enabledElements.length;
+		} else {
+			// Move to the previous element
+			newIndex =
+				(currentIndex - 1 + enabledElements.length) % enabledElements.length;
+		}
+
+		// Focus the new element
+		enabledElements[newIndex].focus();
+	}, []);
+
+	// Add keyboard shortcuts
+	useHotkeys(
+		"mod+shift+up, mod+shift+up",
+		(event) => {
+			event.preventDefault();
+			navigateInputs("up");
+		},
+		{ enableOnFormTags: true },
+	);
+
+	useHotkeys(
+		"mod+shift+down, mod+shift+down",
+		(event) => {
+			event.preventDefault();
+			navigateInputs("down");
+		},
+		{ enableOnFormTags: true },
+	);
+
+	// Add mod+shift+up/down shortcuts to navigate inputs
+	useHotkeys(
+		"mod+shift+up, mod+shift+up",
+		(event) => {
+			event.preventDefault();
+			navigateInputs("up");
+		},
+		{ enableOnFormTags: true },
+	);
+
+	useHotkeys(
+		"mod+shift+down, mod+shift+down",
+		(event) => {
+			event.preventDefault();
+			navigateInputs("down");
+		},
+		{ enableOnFormTags: true },
+	);
+
+	// Focus search input shortcut
+	useHotkeys(
+		"mod+shift+f, mod+shift+f",
+		(event) => {
+			console.log("Triggering focus search input shortcut");
+			event.preventDefault();
+			searchInputRef.current?.focus();
+		},
+		{ enableOnFormTags: true },
+	);
+
+	// Save changes shortcut
+	useHotkeys(
+		"ctrl+s, cmd+s",
+		(event) => {
+			event.preventDefault();
+			// Only trigger save if there are changes to save and we're not already loading
+			if (hasChanges() && !loading) {
+				handleSaveClick();
+			}
+		},
+		{ enableOnFormTags: true },
+	);
+
+	// Handle Enter key in confirmation modal using react-hotkeys-hook
+	useHotkeys(
+		"enter",
+		(event) => {
+			// Only trigger if the modal is open and there are no errors and not loading
+			if (showConfirmModal && !error && !loading && hasChanges()) {
+				event.preventDefault();
+				if (!showConfirmModal) return;
+				saveChanges();
+			}
+		},
+		{
+			enableOnFormTags: true,
+			enabled: showConfirmModal,
+		},
+	);
+
 	return (
-		<div className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col h-full">
+		<div className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
 			<div className="p-4 border-b border-gray-200 bg-gray-50">
 				<div className="flex justify-between items-center mb-3">
 					<h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
@@ -544,6 +661,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 							size={14}
 						/>
 						<Input
+							ref={searchInputRef}
 							type="text"
 							placeholder="Search columns..."
 							value={searchQuery}
@@ -555,15 +673,32 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					{activeTable && hasSelectedRowData && (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button
-									variant="outline"
-									size="sm"
-									className="w-9 h-9 p-0 rounded-full"
+								<div
+									className="relative"
+									onClick={(e) => e.stopPropagation()}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.stopPropagation();
+										}
+									}}
 								>
-									<FiMoreVertical className="text-gray-500" size={16} />
-								</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										className="w-9 h-9 p-0 rounded-full"
+									>
+										<FiMoreVertical className="text-gray-500" size={16} />
+									</Button>
+								</div>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
+							<DropdownMenuContent
+								align="end"
+								className="z-[100]"
+								side="bottom"
+								sideOffset={5}
+								onClick={(e) => e.stopPropagation()}
+								onKeyDown={(e) => e.stopPropagation()}
+							>
 								<DropdownMenuItem onClick={() => setShowCopyRowModal(true)}>
 									<FiCopy className="mr-2 text-purple-500" size={16} />
 									Duplicate Row
@@ -589,85 +724,112 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					</p>
 				</div>
 			)}
+			<div ref={sidebarRef}>
+				{activeTable && hasSelectedRowData && (
+					<>
+						<div className="flex-1 p-4 overflow-auto">
+							<div className="space-y-3">
+								{filteredColumns.map((column) => {
+									const value = selectedRow[column];
+									const isNull = isValueNull(column);
+									const canEdit = !isPrimaryKey(column);
+									const truncatedColumnName = truncateColumnName(column);
+									const inputType = getInputType(column);
+									const columnType = getColumnType(column);
 
-			{activeTable && hasSelectedRowData && (
-				<>
-					<div className="flex-1 p-4 overflow-auto">
-						<div className="space-y-3">
-							{filteredColumns.map((column) => {
-								const value = selectedRow[column];
-								const isNull = isValueNull(column);
-								const canEdit = !isPrimaryKey(column);
-								const truncatedColumnName = truncateColumnName(column);
-								const inputType = getInputType(column);
-								const columnType = getColumnType(column);
-
-								return (
-									<div
-										key={column}
-										className="space-y-1 pb-2 border-b border-gray-100 mb-2"
-									>
-										<div className="flex justify-between items-center">
-											<label
-												htmlFor={`field-${column}`}
-												className="text-xs font-medium text-gray-700"
-												title={column} // Show full column name on hover
-											>
-												{truncatedColumnName}
-												{isPrimaryKey(column) && (
-													<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
-														PK
+									return (
+										<div
+											key={column}
+											className="space-y-1 pb-2 border-b border-gray-100 mb-2"
+										>
+											<div className="flex justify-between items-center">
+												<label
+													htmlFor={`field-${column}`}
+													className="text-xs font-medium text-gray-700"
+													title={column} // Show full column name on hover
+												>
+													{truncatedColumnName}
+													{isPrimaryKey(column) && (
+														<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
+															PK
+														</span>
+													)}
+													<span className="ml-1 text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">
+														({columnType || "N/A"})
 													</span>
-												)}
-												<span className="ml-1 text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">
-													({columnType || "N/A"})
-												</span>
-											</label>
-										</div>
+												</label>
+											</div>
 
-										{isNull ? (
-											<div className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-md text-sm text-gray-400 italic">
-												NULL
-											</div>
-										) : inputType === "json" ? (
-											<div className="h-36 border border-blue-300 rounded-md overflow-hidden">
-												<Editor
-													height="100%"
-													language="json"
-													value={
-														column in editedValues &&
-														editedValues[column] !== null
-															? (editedValues[column] as string)
-															: formatValue(value)
-													}
-													onChange={(value) =>
-														handleMonacoChange(column, value)
-													}
-													options={{
-														minimap: { enabled: false },
-														lineNumbers: "on",
-														fontSize: 12,
-														scrollBeyondLastLine: false,
-														automaticLayout: true,
-														wordWrap: "on",
-														readOnly: !canEdit,
-													}}
-													onMount={handleEditorDidMount}
-													theme="vs"
-												/>
-											</div>
-										) : inputType === "date" ||
-											inputType === "datetime-local" ? (
-											<div className="relative">
+											{isNull ? (
+												<div className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-md text-sm text-gray-400 italic">
+													NULL
+												</div>
+											) : inputType === "json" ? (
+												<div className="h-36 border border-blue-300 rounded-md overflow-hidden">
+													<Editor
+														height="100%"
+														language="json"
+														value={
+															column in editedValues &&
+															editedValues[column] !== null
+																? (editedValues[column] as string)
+																: formatValue(value)
+														}
+														onChange={(value) =>
+															handleMonacoChange(column, value)
+														}
+														options={{
+															minimap: { enabled: false },
+															lineNumbers: "on",
+															fontSize: 12,
+															scrollBeyondLastLine: false,
+															automaticLayout: true,
+															wordWrap: "on",
+															readOnly: !canEdit,
+														}}
+														theme="vs"
+													/>
+												</div>
+											) : inputType === "date" ||
+												inputType === "datetime-local" ? (
+												<div className="relative">
+													<input
+														id={`field-${column}`}
+														type={inputType}
+														readOnly={!canEdit}
+														value={
+															column in editedValues &&
+															editedValues[column] !== null
+																? (editedValues[column] as string)
+																: formatDateForInput(value, inputType)
+														}
+														onChange={
+															canEdit
+																? (e) =>
+																		handleInputChange(column, e.target.value)
+																: undefined
+														}
+														className={`w-full px-3 py-2 border rounded-md text-sm
+														${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 bg-orange-50" : ""}
+													`}
+													/>
+													{!isValidDate(value) && !(column in editedValues) && (
+														<div className="text-xs text-orange-600 mt-1">
+															Invalid date format. Edit to fix.
+														</div>
+													)}
+												</div>
+											) : inputType === "number" ? (
 												<input
 													id={`field-${column}`}
-													type={inputType}
+													type="number"
 													readOnly={!canEdit}
 													value={
 														column in editedValues &&
 														editedValues[column] !== null
 															? (editedValues[column] as string)
-															: formatDateForInput(value, inputType)
+															: formatValue(value)
 													}
 													onChange={
 														canEdit
@@ -675,80 +837,53 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 															: undefined
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm
-														${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 bg-orange-50" : ""}
-													`}
+													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+												`}
 												/>
-												{!isValidDate(value) && !(column in editedValues) && (
-													<div className="text-xs text-orange-600 mt-1">
-														Invalid date format. Edit to fix.
-													</div>
-												)}
-											</div>
-										) : inputType === "number" ? (
-											<input
-												id={`field-${column}`}
-												type="number"
-												readOnly={!canEdit}
-												value={
-													column in editedValues &&
-													editedValues[column] !== null
-														? (editedValues[column] as string)
-														: formatValue(value)
-												}
-												onChange={
-													canEdit
-														? (e) => handleInputChange(column, e.target.value)
-														: undefined
-												}
-												className={`w-full px-3 py-2 border rounded-md text-sm
+											) : (
+												<input
+													id={`field-${column}`}
+													type="text"
+													readOnly={!canEdit}
+													value={
+														column in editedValues &&
+														editedValues[column] !== null
+															? (editedValues[column] as string)
+															: formatValue(value)
+													}
+													onChange={
+														canEdit
+															? (e) => handleInputChange(column, e.target.value)
+															: undefined
+													}
+													className={`w-full px-3 py-2 border rounded-md text-sm
 													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
 												`}
-											/>
-										) : (
-											<input
-												id={`field-${column}`}
-												type="text"
-												readOnly={!canEdit}
-												value={
-													column in editedValues &&
-													editedValues[column] !== null
-														? (editedValues[column] as string)
-														: formatValue(value)
-												}
-												onChange={
-													canEdit
-														? (e) => handleInputChange(column, e.target.value)
-														: undefined
-												}
-												className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-												`}
-											/>
-										)}
-									</div>
-								);
-							})}
+												/>
+											)}
+										</div>
+									);
+								})}
+							</div>
 						</div>
-					</div>
 
-					{/* Fixed save button at the bottom */}
-					{primaryKeys.length > 0 && (
-						<div className="sticky bottom-0 p-3 bg-gray-50 border-t border-gray-200 flex justify-center">
-							<Button
-								variant="default"
-								className="w-full"
-								onClick={handleSaveClick}
-								disabled={!hasChanges() || loading}
-							>
-								<FiSave className="mr-2" size={16} />
-								{loading ? "Saving..." : "Save Changes"}
-							</Button>
-						</div>
-					)}
-				</>
-			)}
-
+						{/* Fixed save button at the bottom */}
+						{primaryKeys.length > 0 && (
+							<div className="sticky bottom-0 p-3 bg-gray-50 border-t border-gray-200 flex justify-center">
+								<Button
+									variant="default"
+									className="w-full"
+									onClick={handleSaveClick}
+									disabled={!hasChanges() || loading}
+								>
+									<FiSave className="mr-2" size={16} />
+									{loading ? "Saving..." : "Save Changes"}
+								</Button>
+							</div>
+						)}
+					</>
+				)}
+			</div>
 			{/* Confirmation Dialog */}
 			<Dialog
 				open={showConfirmModal}

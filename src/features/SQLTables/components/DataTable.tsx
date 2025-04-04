@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
@@ -21,7 +22,6 @@ import {
 	FiChevronLeft,
 	FiChevronRight,
 } from "react-icons/fi";
-import type { MouseEvent } from "react";
 import type { TableDataRow } from "../types";
 import JsonCell from "./JsonCell";
 import FilterModal from "./FilterModal";
@@ -94,29 +94,24 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		filterModalOpenRef.current = filterModalOpen;
 	}, [filterModalOpen]);
 
-	// Add keyboard shortcut event listener
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			// Check for Cmd+F (Mac) or Ctrl+F (Windows)
-			if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-				e.preventDefault(); // Prevent browser's default find behavior
-
-				// Add a check to make sure we don't open when already open
-				if (!filterModalOpen) {
-					setFilterColumn(""); // Clear any pre-selected column
-					setFilterModalOpen(true);
-				}
+	// Add new hotkey using react-hotkeys-hook
+	useHotkeys(
+		"mod+f",
+		(event) => {
+			event.preventDefault(); // Prevent browser find
+			if (!filterModalOpen) {
+				// Open the global filter modal (no specific column)
+				setFilterColumn("");
+				setFilterModalOpen(true);
 			}
-		};
+		},
+		{ enableOnFormTags: true }, // Allow shortcut even if focus is inside table/input
+	);
 
-		document.addEventListener("keydown", handleKeyDown);
-		return () => document.removeEventListener("keydown", handleKeyDown);
-	}, [filterModalOpen]); // Add filterModalOpen to dependencies
-
-	// Function to open filter modal without pre-selecting a column
+	// Re-add the function for the button click
 	const openGlobalFilterModal = () => {
-		// Use the ref for checking if modal is already open
-		if (!filterModalOpenRef.current) {
+		// Check if modal is already open before opening
+		if (!filterModalOpen) {
 			setFilterColumn(""); // Clear any pre-selected column
 			setFilterModalOpen(true);
 		}
@@ -450,18 +445,32 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						{/* Filter icon for each column */}
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-8 w-8 p-0 ml-1 text-gray-500 hover:text-gray-800 hover:bg-gray-200/60 rounded-sm"
-									onClick={(e: MouseEvent<HTMLButtonElement>) =>
-										e.stopPropagation()
-									}
+								<div
+									className="relative"
+									onClick={(e) => e.stopPropagation()}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.stopPropagation();
+										}
+									}}
 								>
-									<FiFilter size={14} />
-								</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8 p-0 ml-1 text-gray-500 hover:text-gray-800 hover:bg-gray-200/60 rounded-sm"
+									>
+										<FiFilter size={14} />
+									</Button>
+								</div>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end">
+							<DropdownMenuContent
+								align="end"
+								className="z-[100]"
+								side="bottom"
+								sideOffset={5}
+								onClick={(e) => e.stopPropagation()}
+								onKeyDown={(e) => e.stopPropagation()}
+							>
 								<DropdownMenuItem
 									onClick={() => handleSortChange(column, "asc")}
 								>
@@ -556,7 +565,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 											<TooltipTrigger asChild>
 												<Button
 													variant="ghost"
-													className={`p-0 h-auto w-full justify-start font-normal truncate text-left ${
+													className={`p-0 h-auto w-full justify-start font-normal truncate text-left hover:bg-transparent ${
 														isNull
 															? "text-gray-400 italic"
 															: isPrimaryKey
