@@ -170,7 +170,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="tables"
-					className="flex h-full mt-0 border-none p-0"
+					className="flex mt-0 border-none p-0"
+					style={{ height: "calc(100% - 50px)" }}
 				>
 					<div
 						className="flex flex-1 flex-row h-screen"
@@ -195,7 +196,10 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 						{/* Main content to show table data */}
 						<div
-							style={{ width: calculateMainContentWidth() }} // Use dynamic width
+							style={{
+								width: calculateMainContentWidth(),
+								height: "calc(100% - 50px)",
+							}} // Use dynamic width
 							className="flex flex-col overflow-hidden bg-background transition-all duration-300 ease-in-out"
 						>
 							{loading && (
@@ -229,9 +233,15 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							/>
 
 							{/* Table Content */}
-							<div className="flex-1 overflow-hidden">
+							<div
+								className="flex-1 overflow-hidden"
+								style={{ height: "calc(100% - 50px)" }}
+							>
 								{activeTable ? (
-									<div className="flex-1 h-full flex flex-col">
+									<div
+										className="flex-1 flex flex-col"
+										style={{ height: "calc(100% - 50px)" }}
+									>
 										{/* Data Table */}
 										<div className="overflow-auto">
 											<DataTable
@@ -268,7 +278,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="query"
-					className="flex-1 h-full mt-0 border-none p-0"
+					className="flex-1 mt-0 border-none p-0 h-full"
 				>
 					<div id="query-panel-container" className="h-full">
 						<QueryPanel connectionId={connectionId} tables={allTables} />

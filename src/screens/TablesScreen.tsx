@@ -26,7 +26,7 @@ function TablesScreenContent() {
 	} = useSidebar();
 
 	// Keyboard shortcuts for sidebar toggles
-	useHotkeys("mod+b", toggleLeftSidebar, { enableOnFormTags: true });
+	useHotkeys("mod+d", toggleLeftSidebar, { enableOnFormTags: true });
 	useHotkeys(
 		"mod+a",
 		(event) => {

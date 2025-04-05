@@ -671,7 +671,10 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	};
 
 	return (
-		<div className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
+		<div
+			className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col overflow-hidden"
+			style={{ height: "calc(100% - 50px" }}
+		>
 			<div className="p-4 border-b border-gray-200 bg-gray-50">
 				<div className="flex justify-between items-center mb-3">
 					<h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">

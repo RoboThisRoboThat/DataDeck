@@ -777,8 +777,11 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	};
 
 	return (
-		<>
-			<div className="h-full flex flex-col overflow-hidden border border-gray-200 rounded-md relative">
+		<div style={{ border: "2px solid red" }}>
+			<div
+				className="flex flex-col overflow-hidden border border-gray-200 rounded-md relative"
+				style={{ height: "calc(100vh - 50px)" }}
+			>
 				{/* Show loading indicator at the top when loading */}
 				{loading && (
 					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200">
@@ -790,7 +793,11 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				{columns.length > 0 && renderTableHeaderControls()}
 
 				{/* Table container with fixed height and horizontal scroll */}
-				<div ref={tableRef} className="relative max-h-screen overflow-auto">
+				<div
+					ref={tableRef}
+					className="relative overflow-auto"
+					style={{ maxHeight: "calc(100vh - 50px)" }}
+				>
 					{/* Table header (sticky) */}
 					{columns.length > 0 && (
 						<div className="sticky top-0 z-10">{renderTableHeader()}</div>
@@ -802,7 +809,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 					) : loading && !hasData ? (
 						renderLoadingState()
 					) : hasData ? (
-						<div className="h-full">
+						<div style={{ height: "calc(100% - 50px)" }}>
 							{data.map((row, index) => renderTableRow(row, index))}
 						</div>
 					) : (
@@ -820,7 +827,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				currentFilter={filters[filterColumn]}
 				onApply={handleFilterApply}
 			/>
-		</>
+		</div>
 	);
 };
 
