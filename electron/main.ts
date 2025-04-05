@@ -22,8 +22,7 @@ const connectionWindows: Record<string, BrowserWindow> = {};
 
 function createWindow() {
 	win = new BrowserWindow({
-		// icon: path.join(process.env.VITE_PUBLIC, 'data-deck-logo.svg'),
-		icon: "/Users/souravdas/Documents/FunProjects/data-deck/public/data-deck-logo.svg",
+		icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
 		width: 1200,
 		height: 800,
 		show: false, // Don't show until ready
@@ -76,7 +75,7 @@ app.whenReady().then(createWindow);
 function createConnectionWindow(connectionId: string) {
 	// Create a new browser window
 	const connectionWindow = new BrowserWindow({
-		icon: path.join(process.env.VITE_PUBLIC, "data-deck-logo.svg"),
+		icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
 		width: 1200,
 		height: 800,
 		show: false, // Don't show until ready

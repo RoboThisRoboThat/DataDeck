@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
+    "build": "vite build && electron-builder --config electron-builder.json",
+    "build:mac": "vite build && electron-builder --config electron-builder.json --mac",
+    "build:win": "vite build && electron-builder --config electron-builder.json --win",
+    "build:all": "vite build && electron-builder --config electron-builder.json -mwl",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -71,24 +74,5 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js",
-  "build": {
-    "appId": "com.data-deck",
-    "productName": "Data Deck",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "dist/**/*"
-    ],
-    "mac": {
-      "icon": "data-deck-logo.svg"
-    },
-    "win": {
-      "icon": "data-deck-logo.svg"
-    },
-    "linux": {
-      "icon": "data-deck-logo.svg"
-    }
-  }
+  "main": "dist-electron/main.js"
 }
