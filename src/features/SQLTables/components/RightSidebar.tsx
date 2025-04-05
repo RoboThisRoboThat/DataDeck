@@ -8,6 +8,7 @@ import {
 	FiSearch,
 	FiCopy,
 	FiMoreVertical,
+	FiEdit,
 } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,9 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showCopyRowModal, setShowCopyRowModal] = useState(false);
+	const [jsonModalOpen, setJsonModalOpen] = useState(false);
+	const [activeJsonColumn, setActiveJsonColumn] = useState<string | null>(null);
+	const [jsonEditorValue, setJsonEditorValue] = useState<string>("");
 	// Monaco instance for future extensions (monaco editor customization)
 	// TODO: Use this when implementing custom editor features
 	// const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
@@ -644,6 +648,26 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		},
 	);
 
+	// Open JSON editor modal
+	const handleOpenJsonModal = (column: string) => {
+		const value =
+			column in editedValues && editedValues[column] !== null
+				? (editedValues[column] as string)
+				: formatValue(selectedRow?.[column]);
+
+		setJsonEditorValue(value);
+		setActiveJsonColumn(column);
+		setJsonModalOpen(true);
+	};
+
+	// Handle JSON editor save
+	const handleJsonEditorSave = () => {
+		if (activeJsonColumn) {
+			handleMonacoChange(activeJsonColumn, jsonEditorValue);
+			setJsonModalOpen(false);
+		}
+	};
+
 	return (
 		<div className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
 			<div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -758,6 +782,17 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 														({columnType || "N/A"})
 													</span>
 												</label>
+												{inputType === "json" && canEdit && (
+													<Button
+														variant="ghost"
+														size="sm"
+														className="h-6 w-6 p-0"
+														onClick={() => handleOpenJsonModal(column)}
+														title="Edit in full-screen"
+													>
+														<FiEdit size={14} className="text-blue-500" />
+													</Button>
+												)}
 											</div>
 
 											{isNull ? (
@@ -961,6 +996,52 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					primaryKeys={primaryKeys}
 				/>
 			)}
+
+			{/* JSON Editor Modal */}
+			<Dialog
+				open={jsonModalOpen}
+				onOpenChange={(open) => {
+					setJsonModalOpen(open);
+					if (!open) {
+						setActiveJsonColumn(null);
+					}
+				}}
+			>
+				<DialogContent className="sm:max-w-4xl h-[80vh]">
+					<DialogHeader>
+						<DialogTitle className="bg-gray-50 -mx-6 -mt-4 px-6 py-3 border-b">
+							Edit JSON {activeJsonColumn && `(${activeJsonColumn})`}
+						</DialogTitle>
+					</DialogHeader>
+
+					<div className="flex-1 h-full py-4 flex flex-col">
+						<div className="flex-1 min-h-[500px]">
+							<Editor
+								height="100%"
+								language="json"
+								value={jsonEditorValue}
+								onChange={(value) => setJsonEditorValue(value || "")}
+								options={{
+									minimap: { enabled: true },
+									lineNumbers: "on",
+									fontSize: 14,
+									scrollBeyondLastLine: true,
+									automaticLayout: true,
+									wordWrap: "on",
+								}}
+								theme="vs"
+							/>
+						</div>
+					</div>
+
+					<DialogFooter className="bg-gray-50 px-6 py-4 -mx-6 -mb-6 border-t">
+						<Button variant="outline" onClick={() => setJsonModalOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleJsonEditorSave}>Save Changes</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
