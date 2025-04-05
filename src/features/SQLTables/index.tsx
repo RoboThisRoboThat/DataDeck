@@ -13,6 +13,7 @@ import {
 } from "../../components/ui/tabs";
 import { Button } from "../../components/ui/button";
 import RightSidebar from "./components/RightSidebar";
+import { useSidebar } from "../../context/SidebarContext";
 
 interface SQLTablesProps {
 	connectionId: string;
@@ -101,6 +102,20 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 		}
 	};
 
+	// Use Sidebar context again to get state
+	const {
+		isLeftSidebarCollapsed,
+		isRightSidebarCollapsed,
+		// No need for toggle functions here anymore
+	} = useSidebar();
+
+	// Calculate main content width dynamically
+	const calculateMainContentWidth = () => {
+		const leftSidebarWidth = isLeftSidebarCollapsed ? 0 : 256; // 256px = w-64
+		const rightSidebarWidth = isRightSidebarCollapsed ? 0 : 288; // 288px = w-72
+		return `calc(100vw - ${leftSidebarWidth}px - ${rightSidebarWidth}px)`;
+	};
+
 	const handleTableSelect = async (tableName: string) => {
 		// Add the table to the list if it's not already there
 		if (!tables.includes(tableName)) {
@@ -161,21 +176,27 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 						className="flex flex-1 flex-row h-screen"
 						id="main-tables-container"
 					>
-						{/* Left Sidebar to show table listing */}
-						<TableList
-							ref={searchInputRef}
-							tables={allTables}
-							openTables={tables}
-							activeTable={activeTable}
-							tableSearch={tableSearch}
-							setTableSearch={setTableSearch}
-							handleTableSelect={handleTableSelect}
-						/>
+						{/* Left Sidebar */}
+						<div
+							className={`transition-all duration-300 ease-in-out flex-shrink-0 ${
+								isLeftSidebarCollapsed ? "w-0 overflow-hidden" : "w-64"
+							}`}
+						>
+							<TableList
+								ref={searchInputRef}
+								tables={allTables}
+								openTables={tables}
+								activeTable={activeTable}
+								tableSearch={tableSearch}
+								setTableSearch={setTableSearch}
+								handleTableSelect={handleTableSelect}
+							/>
+						</div>
 
 						{/* Main content to show table data */}
 						<div
-							style={{ width: "calc(100vw - 256px - 288px)" }}
-							className="flex flex-col overflow-hidden bg-background"
+							style={{ width: calculateMainContentWidth() }} // Use dynamic width
+							className="flex flex-col overflow-hidden bg-background transition-all duration-300 ease-in-out"
 						>
 							{loading && (
 								<div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md dark:bg-blue-900/20 dark:border-blue-800/30 dark:text-blue-400">
@@ -233,8 +254,15 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 								)}
 							</div>
 						</div>
-						{/* Right Sidebar to the data of the selected row */}
-						<RightSidebar connectionId={connectionId} />
+
+						{/* Right Sidebar */}
+						<div
+							className={`transition-all duration-300 ease-in-out flex-shrink-0 ${
+								isRightSidebarCollapsed ? "w-0 overflow-hidden" : "w-72"
+							}`}
+						>
+							<RightSidebar connectionId={connectionId} />
+						</div>
 					</div>
 				</TabsContent>
 
@@ -260,4 +288,4 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 	);
 }
 
-export default SQLTables;
+export default SQLTables; // Export the original component

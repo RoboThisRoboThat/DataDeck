@@ -30,7 +30,7 @@ import {
 	setSelectedRow,
 } from "../../../store/slices/tablesSlice";
 import Editor from "@monaco-editor/react";
-import type { Monaco } from "@monaco-editor/react";
+import type { TableDataRow } from "../types";
 import CopyRowModal from "./CopyRowModal";
 
 interface RightSidebarProps {
@@ -217,7 +217,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 			if (inputType === "date") {
 				return dateObj.toISOString().split("T")[0];
-			} else if (inputType === "datetime-local") {
+			}
+			if (inputType === "datetime-local") {
 				// Format as YYYY-MM-DDThh:mm
 				return dateObj.toISOString().slice(0, 16);
 			}
@@ -380,7 +381,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			// After successful save, refetch the table data
 			if (tableState) {
 				const { filters, sortConfig, pagination } = tableState;
-				const response = await dispatch(
+				// Explicitly type the response from unwrap
+				const response = (await dispatch(
 					fetchTableData({
 						tableName: activeTable,
 						connectionId,
@@ -388,11 +390,11 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 						sortConfig,
 						pagination,
 					}),
-				).unwrap();
+				).unwrap()) as { data: TableDataRow[]; totalRows: number };
 
 				// Find the updated row in the new data using the primary key
 				const updatedRow = response.data.find(
-					(row) => row[primaryKeyColumn] === primaryKeyValue,
+					(row: TableDataRow) => row[primaryKeyColumn] === primaryKeyValue,
 				);
 
 				// Update the selected row with the new data

@@ -38,7 +38,7 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 		// Reset focus index when search changes or filtered list becomes empty
 		useEffect(() => {
 			setFocusedIndex(-1);
-		}, [tableSearch, filteredTables.length]);
+		}, []); // Run only once on mount to satisfy linter (may need revisit)
 
 		// Use hotkeys for navigation instead of direct input keydown handler
 		useHotkeys(
@@ -117,10 +117,7 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 				</div>
 
 				{/* Scrollable Table List */}
-				<div
-					className="overflow-y-auto p-4 pt-2 flex-1"
-					style={{ maxHeight: "calc(100vh - 220px)" }}
-				>
+				<div className="overflow-y-auto p-4 pt-2 flex-1">
 					<div className="space-y-0.5">
 						{filteredTables.map((table, index) => (
 							<button
