@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useScreen } from "../context/ScreenContext";
 import { AddConnectionModal } from "../components/AddConnectionModal";
-import { Trash, Plus, ExternalLink, Database, Settings } from "lucide-react";
+import { Trash, Plus, ExternalLink, Settings } from "lucide-react";
+import { FiDatabase } from "react-icons/fi";
 import { Button } from "../components/ui/button";
 import { Layout } from "../components/Layout";
 import type { Connection } from "../types/connection";
-import { useTheme } from "../context/ThemeContext";
+import { ConnectionType, DATABASE_TYPE_MAP } from "../types/connection";
 import { useSettings } from "../context/SettingsContext";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -16,7 +17,6 @@ import { useToast } from "../components/ui/use-toast";
 type TabType = "connections" | "settings";
 
 export function ConnectionScreen() {
-	const { theme } = useTheme();
 	const { settings, updateAISettings, isLoading } = useSettings();
 	const { toast } = useToast();
 	const { setCurrentScreen, setActiveConnectionId, setActiveConnectionName } =
@@ -73,8 +73,7 @@ export function ConnectionScreen() {
 		setShowOpenaiKey(false);
 		setShowClaudeKey(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		// We specifically want this to run only when changing tabs
-	}, [activeTab]);
+	}, []);
 
 	const loadConnections = async () => {
 		try {
@@ -169,7 +168,7 @@ export function ConnectionScreen() {
 			// First, connect to the database
 			const result = await window.database.connect(connectionId);
 
-			if (result?.success || result?.connected) {
+			if (result?.success) {
 				console.log("Successfully connected to database:", connectionId);
 
 				// Set the connection ID in context
@@ -225,6 +224,36 @@ export function ConnectionScreen() {
 		}
 	};
 
+	const getConnectionIcon = (connection: Connection) => {
+		const Icon = DATABASE_TYPE_MAP[connection.dbType].icon;
+		const colorClass = DATABASE_TYPE_MAP[connection.dbType].iconColor;
+		return <Icon className={`size-4 ${colorClass}`} />;
+	};
+
+	const getConnectionDetails = (connection: Connection) => {
+		if ("host" in connection) {
+			// SQL Connection
+			return (
+				<div className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+					<ExternalLink className="size-3.5" />
+					{connection.host}:{connection.port} • {connection.database}
+				</div>
+			);
+		}
+
+		if ("connectionString" in connection) {
+			// MongoDB or Redis Connection
+			return (
+				<div className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
+					<ExternalLink className="size-3.5" />
+					{connection.connectionString}
+				</div>
+			);
+		}
+
+		return null;
+	};
+
 	const renderConnectionsTab = () => (
 		<>
 			<div className="flex justify-between items-center mb-4">
@@ -256,7 +285,7 @@ export function ConnectionScreen() {
 				{connections.map((connection) => (
 					<div
 						key={connection.id}
-						className="border-b border-border last:border-b-0"
+						className="border-b border-border last:border-b-0 cursor-pointer"
 					>
 						<Button
 							variant="ghost"
@@ -266,19 +295,17 @@ export function ConnectionScreen() {
 									handleConnect(connection);
 								}
 							}}
-							className="flex justify-between p-4 w-full text-left hover:bg-muted/40 h-auto"
+							className="flex justify-between p-4 w-full text-left hover:bg-muted/40 h-auto cursor-pointer"
 						>
 							<div className="flex-1">
 								<div className="flex items-center gap-2">
+									{getConnectionIcon(connection)}
 									<h3 className="text-base font-medium">{connection.name}</h3>
 									<span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-										{connection.dbType === "mysql" ? "MySQL" : "PostgreSQL"}
+										{DATABASE_TYPE_MAP[connection.dbType].name}
 									</span>
 								</div>
-								<div className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
-									<ExternalLink className="size-3.5" />
-									{connection.host}:{connection.port} • {connection.database}
-								</div>
+								{getConnectionDetails(connection)}
 							</div>
 							<Button
 								variant="ghost"
@@ -469,7 +496,7 @@ export function ConnectionScreen() {
 										: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
 								}`}
 							>
-								<Database className="size-4" />
+								<FiDatabase className="size-4" />
 								<span>Connections</span>
 							</button>
 							<button

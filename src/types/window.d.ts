@@ -1,63 +1,97 @@
-import type { Connection } from "./connection";
-
-declare global {
-	interface Window {
-		database: {
-			connect: (id: string) => Promise<{ success: boolean; message: string }>;
-			disconnect: (id: string) => Promise<void>;
-			query: (id: string, sql: string) => Promise<Record<string, unknown>>;
-			getTables: (id: string) => Promise<Array<{ name: string; type: string }>>;
-			getPrimaryKey: (id: string, tableName: string) => Promise<string[]>;
-			updateCell: (
-				id: string,
-				tableName: string,
-				primaryKeyColumn: string,
-				primaryKeyValue: string | number,
-				columnToUpdate: string,
-				newValue: unknown,
-			) => Promise<boolean>;
-			isConnected: (id: string) => Promise<boolean>;
-			getActiveConnections: () => Promise<string[]>;
-			addRow: (
-				connectionId: string,
-				tableName: string,
-				data: Record<string, unknown>,
-			) => Promise<boolean>;
-		};
-		store: {
-			getConnections: () => Promise<Connection[]>;
-			addConnection: (connection: Connection) => Promise<Connection[]>;
-			deleteConnection: (id: string) => Promise<Connection[]>;
-		};
-		windowManager: {
-			openConnectionWindow: (
-				connectionId: string,
-				connectionName: string,
-				urlParams?: string,
-			) => Promise<{
-				success: boolean;
-				message?: string;
-			}>;
-			setMainWindowFullscreen: () => Promise<{
-				success: boolean;
-				message?: string;
-			}>;
-			focusConnectionWindow: (connectionId: string) => Promise<boolean>;
-			getCurrentWindowId: () => Promise<{
-				success: boolean;
-				windowId?: number;
-				message?: string;
-			}>;
-			setWindowFullscreen: (windowId: number) => Promise<{
-				success: boolean;
-				windowId?: number;
-				message?: string;
-			}>;
-		};
-		api: {
-			onWindowClosed: (callback: (connectionId: string) => void) => void;
-			offWindowClosed: () => void;
-			getOpenWindows: () => Promise<Record<string, boolean>>;
-		};
-	}
+// Define table schema types
+interface TableSchemaColumn {
+	name: string;
+	type: string;
+	length?: number;
+	precision?: number;
+	isPrimary: boolean;
+	isNullable: boolean;
+	defaultValue?: string;
 }
+
+interface TableSchemaForeignKey {
+	column: string;
+	referencedTable: string;
+	referencedColumn: string;
+}
+
+interface TableSchema {
+	name: string;
+	columns: TableSchemaColumn[];
+	foreignKeys: TableSchemaForeignKey[];
+}
+
+// Define query result types
+interface QueryResultColumn {
+	name: string;
+	type: string;
+}
+
+interface QueryResult {
+	columns: QueryResultColumn[];
+	rows: Record<string, unknown>[];
+	rowCount: number;
+	error?: string;
+}
+
+// Add a new interface for table structure
+interface ColumnStructure {
+	column: string;
+	type: "json" | "string" | "number" | "boolean";
+}
+
+interface Database {
+	connect: (
+		connectionId: string,
+	) => Promise<
+		{ success?: boolean; connected?: boolean; message: string } & Record<
+			string,
+			unknown
+		>
+	>;
+	disconnect: (
+		connectionId: string,
+	) => Promise<{ success: boolean; message?: string }>;
+	query: (connectionId: string, sql: string) => Promise<QueryResult>;
+	stopQuery: (
+		connectionId: string,
+	) => Promise<{ success: boolean; message?: string }>;
+	getTables: (
+		connectionId: string,
+	) => Promise<Array<{ name: string; type: string }>>;
+	getPrimaryKey: (connectionId: string, tableName: string) => Promise<string[]>;
+	getTableStructure: (
+		connectionId: string,
+		tableName: string,
+	) => Promise<ColumnStructure[]>;
+	updateCell: (
+		connectionId: string,
+		tableName: string,
+		primaryKeyColumn: string,
+		primaryKeyValue: string | number,
+		columnToUpdate: string,
+		newValue: unknown,
+	) => Promise<{ success: boolean; message?: string }>;
+	isConnected: (connectionId: string) => Promise<boolean>;
+	getActiveConnections: () => Promise<string[]>;
+	getDatabaseSchema: (
+		connectionId: string,
+		forceRefresh?: boolean,
+	) => Promise<{ data: TableSchema[]; dbType: string }>;
+	clearSchemaCache: (connectionId: string) => Promise<{ success: boolean }>;
+	addRow: (
+		connectionId: string,
+		tableName: string,
+		data: Record<string, unknown>,
+	) => Promise<boolean>;
+}
+
+export type {
+	TableSchemaColumn,
+	TableSchemaForeignKey,
+	TableSchema,
+	QueryResultColumn,
+	QueryResult,
+	ColumnStructure,
+	Database,
+};
