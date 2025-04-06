@@ -63,26 +63,18 @@ ipcMain.handle("window:setWindowFullscreen", (_, windowId) => {
 // Connection management IPC handlers
 ipcMain.handle("db:connect", async (_, connectionId) => {
 	try {
-		console.log("Main process: connecting to DB with ID:", connectionId);
-
 		// Check if already connected
 		const isAlreadyConnected = storeService.isConnected(connectionId);
 
-		// If already connected, return success immediately
+		// If already connected, disconnect first and then reconnect
 		if (isAlreadyConnected) {
-			console.log("Connection already active:", connectionId);
-			return {
-				success: true,
-				message: "Already connected",
-			};
+			await storeService.disconnectFromDb(connectionId);
 		}
 
-		// Otherwise attempt a new connection
+		// Attempt a new connection
 		const result = await storeService.connectToDb(connectionId);
-		console.log("Main process: connection result:", result);
 		return result;
 	} catch (error) {
-		console.error("Main process: connection error:", error);
 		return {
 			success: false,
 			message:
