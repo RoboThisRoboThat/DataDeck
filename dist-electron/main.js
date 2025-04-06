@@ -10,9 +10,8 @@ var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var _validator, _encryptionKey, _options, _defaultValues;
 import electron, { BrowserWindow, app as app$1, ipcMain as ipcMain$1 } from "electron";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import process$4 from "node:process";
+import path from "node:path";
 import { promisify, isDeepStrictEqual } from "node:util";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -33,6 +32,7 @@ import require$$0$6 from "url";
 import os$1 from "os";
 import fs$1 from "fs";
 import { performance as performance$1 } from "perf_hooks";
+import { fileURLToPath } from "node:url";
 const isObject = (value) => {
   const type2 = typeof value;
   return value !== null && (type2 === "object" || type2 === "function");
@@ -33436,27 +33436,21 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-var hasRequiredField_flags;
-function requireField_flags() {
-  if (hasRequiredField_flags) return field_flags;
-  hasRequiredField_flags = 1;
-  field_flags.NOT_NULL = 1;
-  field_flags.PRI_KEY = 2;
-  field_flags.UNIQUE_KEY = 4;
-  field_flags.MULTIPLE_KEY = 8;
-  field_flags.BLOB = 16;
-  field_flags.UNSIGNED = 32;
-  field_flags.ZEROFILL = 64;
-  field_flags.BINARY = 128;
-  field_flags.ENUM = 256;
-  field_flags.AUTO_INCREMENT = 512;
-  field_flags.TIMESTAMP = 1024;
-  field_flags.SET = 2048;
-  field_flags.NO_DEFAULT_VALUE = 4096;
-  field_flags.ON_UPDATE_NOW = 8192;
-  field_flags.NUM = 32768;
-  return field_flags;
-}
+field_flags.NOT_NULL = 1;
+field_flags.PRI_KEY = 2;
+field_flags.UNIQUE_KEY = 4;
+field_flags.MULTIPLE_KEY = 8;
+field_flags.BLOB = 16;
+field_flags.UNSIGNED = 32;
+field_flags.ZEROFILL = 64;
+field_flags.BINARY = 128;
+field_flags.ENUM = 256;
+field_flags.AUTO_INCREMENT = 512;
+field_flags.TIMESTAMP = 1024;
+field_flags.SET = 2048;
+field_flags.NO_DEFAULT_VALUE = 4096;
+field_flags.ON_UPDATE_NOW = 8192;
+field_flags.NUM = 32768;
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33520,7 +33514,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = requireField_flags();
+    const fiedFlags = field_flags;
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36414,7 +36408,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$7 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = requireField_flags();
+const FieldFlags = field_flags;
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -43919,17 +43913,32 @@ const storeService = {
     return await service.addRow(tableName, data);
   }
 };
+let __dirname = path.dirname(fileURLToPath(import.meta.url));
 class WindowService {
   constructor() {
     __publicField(this, "connectionWindows", {});
     __publicField(this, "win", null);
     __publicField(this, "VITE_DEV_SERVER_URL", process.env.VITE_DEV_SERVER_URL);
-    __publicField(this, "MAIN_DIST", path.join(process.env.APP_ROOT, "dist-electron"));
-    __publicField(this, "RENDERER_DIST", path.join(process.env.APP_ROOT, "dist"));
+    __publicField(this, "MAIN_DIST", "");
+    __publicField(this, "RENDERER_DIST", "");
+    try {
+      process.env.APP_ROOT = path.join(__dirname, "..");
+      this.MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+      this.RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+      process.env.VITE_PUBLIC = this.VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : this.RENDERER_DIST;
+      console.log("WindowService initialized with __dirname:", __dirname);
+      console.log("APP_ROOT set to:", process.env.APP_ROOT);
+    } catch (error2) {
+      console.error("Error initializing WindowService:", error2);
+      __dirname = process.cwd();
+      process.env.APP_ROOT = process.cwd();
+      this.MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+      this.RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+    }
   }
   createConnectionWindow(connectionId) {
     const connectionWindow = new BrowserWindow({
-      icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
+      icon: path.join(process.env.VITE_PUBLIC || "", "icon.png"),
       width: 1200,
       height: 800,
       show: false,
@@ -43964,48 +43973,122 @@ class WindowService {
     return connectionWindow.id;
   }
   createWindow() {
-    this.win = new BrowserWindow({
-      icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
-      width: 1200,
-      height: 800,
-      show: false,
-      // Don't show until ready
-      webPreferences: {
-        preload: path.join(__dirname, "preload.mjs")
+    try {
+      this.win = new BrowserWindow({
+        icon: path.join(process.env.VITE_PUBLIC || "", "icon.png"),
+        width: 1200,
+        height: 800,
+        show: false,
+        // Don't show until ready
+        webPreferences: {
+          preload: path.join(__dirname, "preload.mjs")
+        }
+      });
+      this.win.once("ready-to-show", () => {
+        if (this.win) {
+          this.win.show();
+        }
+      });
+      this.win.webContents.on("did-finish-load", () => {
+        var _a;
+        (_a = this.win) == null ? void 0 : _a.webContents.send(
+          "main-process-message",
+          (/* @__PURE__ */ new Date()).toLocaleString()
+        );
+      });
+      if (this.VITE_DEV_SERVER_URL) {
+        this.win.loadURL(this.VITE_DEV_SERVER_URL);
+      } else {
+        this.win.loadFile(path.join(this.RENDERER_DIST, "index.html"));
       }
-    });
-    this.win.once("ready-to-show", () => {
-      if (this.win) {
-        this.win.show();
+    } catch (error2) {
+      console.error("Error creating main window:", error2);
+    }
+  }
+  focusOnConnectionWindow(connectionId) {
+    try {
+      if (this.connectionWindows[connectionId] && !this.connectionWindows[connectionId].isDestroyed()) {
+        this.connectionWindows[connectionId].focus();
+        return true;
       }
-    });
-    this.win.webContents.on("did-finish-load", () => {
-      var _a;
-      (_a = this.win) == null ? void 0 : _a.webContents.send(
-        "main-process-message",
-        (/* @__PURE__ */ new Date()).toLocaleString()
+      return false;
+    } catch (error2) {
+      console.error(
+        `Failed to focus window for connection ${connectionId}:`,
+        error2
       );
-    });
-    if (this.VITE_DEV_SERVER_URL) {
-      this.win.loadURL(this.VITE_DEV_SERVER_URL);
-    } else {
-      this.win.loadFile(path.join(this.RENDERER_DIST, "index.html"));
+      return false;
+    }
+  }
+  getOpenWindows() {
+    const openWindows = {};
+    for (const connectionId of Object.keys(this.connectionWindows)) {
+      try {
+        const windowExists = this.connectionWindows[connectionId] && !this.connectionWindows[connectionId].isDestroyed();
+        openWindows[connectionId] = windowExists;
+        if (!windowExists) {
+          delete this.connectionWindows[connectionId];
+        }
+      } catch (error2) {
+        console.error(
+          `Error checking window status for ${connectionId}:`,
+          error2
+        );
+        openWindows[connectionId] = false;
+        delete this.connectionWindows[connectionId];
+      }
+    }
+    return openWindows;
+  }
+  getCurrentWindowId(event) {
+    try {
+      const webContents = event.sender;
+      const win = BrowserWindow.fromWebContents(webContents);
+      if (win) {
+        return { success: true, windowId: win.id };
+      }
+      return {
+        success: false,
+        message: "Cannot find window for this webContents"
+      };
+    } catch (error2) {
+      console.error("Failed to get current window ID:", error2);
+      return {
+        success: false,
+        message: error2 instanceof Error ? error2.message : "Unknown error getting window ID"
+      };
+    }
+  }
+  setWindowFullscreen(windowId) {
+    try {
+      let targetWindow = null;
+      if (!windowId) {
+        targetWindow = this.win;
+      } else {
+        const allWindows = BrowserWindow.getAllWindows();
+        targetWindow = allWindows.find((w) => w.id === windowId) || null;
+      }
+      if (targetWindow && !targetWindow.isDestroyed()) {
+        targetWindow.setFullScreen(true);
+        return { success: true, windowId: targetWindow.id };
+      }
+      return { success: false, message: "Window not available" };
+    } catch (error2) {
+      console.error("Failed to set window to fullscreen:", error2);
+      return {
+        success: false,
+        message: error2 instanceof Error ? error2.message : "Unknown error setting fullscreen"
+      };
     }
   }
 }
 const WindowService$1 = new WindowService();
-const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-const connectionWindows = {};
 app$1.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app$1.quit();
-    win = null;
+    if (WindowService$1) {
+      WindowService$1.win = null;
+    }
   }
 });
 app$1.on("activate", () => {
@@ -44013,7 +44096,7 @@ app$1.on("activate", () => {
     WindowService$1.createWindow();
   }
 });
-app$1.whenReady().then(WindowService$1.createWindow);
+app$1.whenReady().then(() => WindowService$1.createWindow());
 ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId) => {
   try {
     const windowId = WindowService$1.createConnectionWindow(connectionId);
@@ -44027,92 +44110,16 @@ ipcMain$1.handle("window:openConnectionWindow", async (_, connectionId) => {
   }
 });
 ipcMain$1.handle("window:focusConnectionWindow", async (_, connectionId) => {
-  try {
-    if (connectionWindows[connectionId] && !connectionWindows[connectionId].isDestroyed()) {
-      connectionWindows[connectionId].focus();
-      return true;
-    }
-    return false;
-  } catch (error2) {
-    console.error(
-      `Failed to focus window for connection ${connectionId}:`,
-      error2
-    );
-    return false;
-  }
+  WindowService$1.focusOnConnectionWindow(connectionId);
 });
 ipcMain$1.handle("window:getOpenWindows", () => {
-  const openWindows = {};
-  for (const connectionId of Object.keys(connectionWindows)) {
-    try {
-      const windowExists = connectionWindows[connectionId] && !connectionWindows[connectionId].isDestroyed();
-      openWindows[connectionId] = windowExists;
-      if (!windowExists) {
-        delete connectionWindows[connectionId];
-      }
-    } catch (error2) {
-      console.error(`Error checking window status for ${connectionId}:`, error2);
-      openWindows[connectionId] = false;
-      delete connectionWindows[connectionId];
-    }
-  }
-  return openWindows;
+  return WindowService$1.getOpenWindows();
 });
 ipcMain$1.handle("window:getCurrentWindowId", (event) => {
-  try {
-    const webContents = event.sender;
-    const win2 = BrowserWindow.fromWebContents(webContents);
-    if (win2) {
-      return { success: true, windowId: win2.id };
-    }
-    return {
-      success: false,
-      message: "Cannot find window for this webContents"
-    };
-  } catch (error2) {
-    console.error("Failed to get current window ID:", error2);
-    return {
-      success: false,
-      message: error2 instanceof Error ? error2.message : "Unknown error getting window ID"
-    };
-  }
+  return WindowService$1.getCurrentWindowId(event);
 });
 ipcMain$1.handle("window:setWindowFullscreen", (_, windowId) => {
-  try {
-    let targetWindow = null;
-    if (!windowId) {
-      targetWindow = win;
-    } else {
-      const allWindows = BrowserWindow.getAllWindows();
-      targetWindow = allWindows.find((w) => w.id === windowId) || null;
-    }
-    if (targetWindow && !targetWindow.isDestroyed()) {
-      targetWindow.setFullScreen(true);
-      return { success: true, windowId: targetWindow.id };
-    }
-    return { success: false, message: "Window not available" };
-  } catch (error2) {
-    console.error("Failed to set window to fullscreen:", error2);
-    return {
-      success: false,
-      message: error2 instanceof Error ? error2.message : "Unknown error setting fullscreen"
-    };
-  }
-});
-ipcMain$1.handle("window:setMainWindowFullscreen", () => {
-  try {
-    if (win && !win.isDestroyed()) {
-      win.setFullScreen(true);
-      return { success: true };
-    }
-    return { success: false, message: "Main window not available" };
-  } catch (error2) {
-    console.error("Failed to set main window to fullscreen:", error2);
-    return {
-      success: false,
-      message: error2 instanceof Error ? error2.message : "Unknown error setting fullscreen"
-    };
-  }
+  WindowService$1.setWindowFullscreen(windowId);
 });
 ipcMain$1.handle("db:connect", async (_, connectionId) => {
   try {
@@ -44162,45 +44169,32 @@ ipcMain$1.handle("db:getTables", async (_, connectionId) => {
   }
 });
 ipcMain$1.handle("db:getTableStructure", async (_, connectionId, tableName) => {
-  console.log(
-    "IPC: Getting table structure for table:",
-    tableName,
-    "connection:",
-    connectionId
-  );
   try {
     const result = await storeService.getTableStructure(
       connectionId,
       tableName
     );
-    console.log("IPC: Got table structure:", result);
     return result;
   } catch (error2) {
-    console.error("IPC: Error getting table structure:", error2);
-    throw error2;
+    throw new Error(
+      `Failed to get structure for table '${tableName}': ${error2 instanceof Error ? error2.message : "Unknown error"}`
+    );
   }
 });
 ipcMain$1.handle("db:getPrimaryKey", async (_, connectionId, tableName) => {
-  console.log(
-    "IPC: Getting primary key for table:",
-    tableName,
-    "connection:",
-    connectionId
-  );
   try {
     const result = await storeService.getPrimaryKey(connectionId, tableName);
-    console.log("IPC: Got primary keys:", result);
     return result;
   } catch (error2) {
-    console.error("IPC: Error getting primary keys:", error2);
-    throw error2;
+    throw new Error(
+      `Failed to get primary key for table '${tableName}': ${error2 instanceof Error ? error2.message : "Unknown error"}`
+    );
   }
 });
 ipcMain$1.handle(
   "db:updateCell",
   async (_, connectionId, tableName, primaryKeyColumn, primaryKeyValue, columnToUpdate, newValue) => {
     try {
-      console.log("Print the connection id here:=======>", connectionId);
       const result = await storeService.updateCell(
         connectionId,
         tableName,
@@ -44209,11 +44203,11 @@ ipcMain$1.handle(
         columnToUpdate,
         newValue
       );
-      console.log("IPC: Cell update result:", result);
       return result;
     } catch (error2) {
-      console.error("IPC: Error updating cell:", error2);
-      throw error2;
+      throw new Error(
+        `Failed to update cell in table '${tableName}': ${error2 instanceof Error ? error2.message : "Unknown error"}`
+      );
     }
   }
 );
@@ -44254,7 +44248,6 @@ ipcMain$1.handle("stop-query", async (_, args) => {
     const result = await storeService.cancelQuery(connectionId);
     return { success: true, result };
   } catch (error2) {
-    console.error("Error cancelling query:", error2);
     return {
       success: false,
       message: error2 instanceof Error ? error2.message : "Failed to cancel query"
@@ -44266,7 +44259,6 @@ ipcMain$1.handle("save-query", async (_, args) => {
     const result = await storeService.saveQuery(args);
     return result;
   } catch (error2) {
-    console.error("Error saving query:", error2);
     return {
       error: error2 instanceof Error ? error2.message : "Failed to save query"
     };
@@ -44277,7 +44269,6 @@ ipcMain$1.handle("get-saved-queries", async (_, args) => {
     const result = await storeService.getSavedQueries(args.connectionId);
     return result;
   } catch (error2) {
-    console.error("Error getting saved queries:", error2);
     return {
       error: error2 instanceof Error ? error2.message : "Failed to get saved queries"
     };
@@ -44288,7 +44279,6 @@ ipcMain$1.handle("delete-query", async (_, args) => {
     const result = await storeService.deleteQuery(args.connectionId, args.name);
     return result;
   } catch (error2) {
-    console.error("Error deleting query:", error2);
     return {
       error: error2 instanceof Error ? error2.message : "Failed to delete query"
     };
@@ -44301,7 +44291,6 @@ ipcMain$1.handle(
       connectionId,
       forceRefresh
     );
-    console.log("Print the database type here=====>", data.dbType);
     return data;
   }
 );
@@ -44397,32 +44386,13 @@ This query will fetch all users created in the last 7 days, sorted by creation d
     };
   }
 });
-ipcMain$1.handle("debug:getAISettings", () => {
-  var _a, _b, _c, _d;
-  const settings = storeService.getSettings();
-  return {
-    hasSettings: !!settings,
-    hasAISection: !!(settings == null ? void 0 : settings.ai),
-    openaiKeyPresent: !!((_a = settings == null ? void 0 : settings.ai) == null ? void 0 : _a.openaiApiKey),
-    claudeKeyPresent: !!((_b = settings == null ? void 0 : settings.ai) == null ? void 0 : _b.claudeApiKey),
-    // Add partial key info for verification without exposing full keys
-    openaiKeyPreview: ((_c = settings == null ? void 0 : settings.ai) == null ? void 0 : _c.openaiApiKey) ? `${settings.ai.openaiApiKey.substring(0, 3)}...${settings.ai.openaiApiKey.substring(settings.ai.openaiApiKey.length - 4)}` : null,
-    claudeKeyPreview: ((_d = settings == null ? void 0 : settings.ai) == null ? void 0 : _d.claudeApiKey) ? `${settings.ai.claudeApiKey.substring(0, 3)}...${settings.ai.claudeApiKey.substring(settings.ai.claudeApiKey.length - 4)}` : null
-  };
-});
 ipcMain$1.handle("db:addRow", async (_, connectionId, tableName, data) => {
   try {
-    console.log("IPC: Adding new row to table:", tableName, "data:", data);
     const result = await storeService.addRow(connectionId, tableName, data);
-    console.log("IPC: Row addition result:", result);
     return result;
   } catch (error2) {
-    console.error("IPC: Error adding new row:", error2);
-    throw error2;
+    throw new Error(
+      `Failed to add new row to table '${tableName}': ${error2 instanceof Error ? error2.message : "Unknown error"}`
+    );
   }
 });
-export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
-};

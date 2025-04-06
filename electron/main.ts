@@ -1,11 +1,6 @@
 import { app, BrowserWindow, ipcMain } from "electron";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import { storeService } from "./services/store";
 import WindowService from "./services/window.service";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname, "..");
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -13,7 +8,9 @@ process.env.APP_ROOT = path.join(__dirname, "..");
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
 		app.quit();
-		WindowService.win = null;
+		if (WindowService) {
+			WindowService.win = null;
+		}
 	}
 });
 
@@ -23,7 +20,7 @@ app.on("activate", () => {
 	}
 });
 
-app.whenReady().then(WindowService.createWindow);
+app.whenReady().then(() => WindowService.createWindow());
 
 // Function to create a new connection window
 

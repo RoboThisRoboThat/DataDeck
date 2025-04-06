@@ -1,22 +1,47 @@
 import { BrowserWindow } from "electron";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+let __dirname = path.dirname(fileURLToPath(import.meta.url));
 class WindowService {
 	public connectionWindows: Record<string, BrowserWindow> = {};
 	public win: BrowserWindow | null = null;
-	public VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-	public MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-	public RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+	public VITE_DEV_SERVER_URL: string | undefined =
+		process.env.VITE_DEV_SERVER_URL;
+	public MAIN_DIST = "";
+	public RENDERER_DIST = "";
 
 	constructor() {
-		process.env.VITE_PUBLIC = this.VITE_DEV_SERVER_URL
-			? path.join(process.env.APP_ROOT, "public")
-			: this.RENDERER_DIST;
+		try {
+			// Initialize __dirname first to avoid undefined errors
+
+			// Set APP_ROOT with a fallback to current working directory
+			process.env.APP_ROOT = path.join(__dirname, "..");
+
+			// Set up paths after __dirname is properly initialized
+			this.MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+			this.RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+
+			// Set VITE_PUBLIC based on dev server URL
+			process.env.VITE_PUBLIC = this.VITE_DEV_SERVER_URL
+				? path.join(process.env.APP_ROOT, "public")
+				: this.RENDERER_DIST;
+
+			console.log("WindowService initialized with __dirname:", __dirname);
+			console.log("APP_ROOT set to:", process.env.APP_ROOT);
+		} catch (error) {
+			console.error("Error initializing WindowService:", error);
+			// Fallback to current working directory if there's an error
+			__dirname = process.cwd();
+			process.env.APP_ROOT = process.cwd();
+			this.MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+			this.RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+		}
 	}
 
 	public createConnectionWindow(connectionId: string) {
 		// Create a new browser window
 		const connectionWindow = new BrowserWindow({
-			icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
+			icon: path.join(process.env.VITE_PUBLIC || "", "icon.png"),
 			width: 1200,
 			height: 800,
 			show: false, // Don't show until ready
@@ -68,38 +93,42 @@ class WindowService {
 	}
 
 	public createWindow() {
-		this.win = new BrowserWindow({
-			icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
-			width: 1200,
-			height: 800,
-			show: false, // Don't show until ready
-			webPreferences: {
-				preload: path.join(__dirname, "preload.mjs"),
-			},
-		});
+		try {
+			this.win = new BrowserWindow({
+				icon: path.join(process.env.VITE_PUBLIC || "", "icon.png"),
+				width: 1200,
+				height: 800,
+				show: false, // Don't show until ready
+				webPreferences: {
+					preload: path.join(__dirname, "preload.mjs"),
+				},
+			});
 
-		// Wait for the window to be ready to show
-		this.win.once("ready-to-show", () => {
-			if (this.win) {
-				this.win.show();
-				// Don't set fullscreen by default for the main window
-				// as that might be disruptive on first launch
+			// Wait for the window to be ready to show
+			this.win.once("ready-to-show", () => {
+				if (this.win) {
+					this.win.show();
+					// Don't set fullscreen by default for the main window
+					// as that might be disruptive on first launch
+				}
+			});
+
+			// Test active push message to Renderer-process.
+			this.win.webContents.on("did-finish-load", () => {
+				this.win?.webContents.send(
+					"main-process-message",
+					new Date().toLocaleString(),
+				);
+			});
+
+			if (this.VITE_DEV_SERVER_URL) {
+				this.win.loadURL(this.VITE_DEV_SERVER_URL);
+			} else {
+				// win.loadFile('dist/index.html')
+				this.win.loadFile(path.join(this.RENDERER_DIST, "index.html"));
 			}
-		});
-
-		// Test active push message to Renderer-process.
-		this.win.webContents.on("did-finish-load", () => {
-			this.win?.webContents.send(
-				"main-process-message",
-				new Date().toLocaleString(),
-			);
-		});
-
-		if (this.VITE_DEV_SERVER_URL) {
-			this.win.loadURL(this.VITE_DEV_SERVER_URL);
-		} else {
-			// win.loadFile('dist/index.html')
-			this.win.loadFile(path.join(this.RENDERER_DIST, "index.html"));
+		} catch (error) {
+			console.error("Error creating main window:", error);
 		}
 	}
 

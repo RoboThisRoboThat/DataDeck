@@ -2,6 +2,21 @@ import { ipcRenderer, contextBridge } from "electron";
 import type { Connection } from "../src/types/connection";
 import type { AppSettings, AISettings } from "../src/types/settings";
 
+// Define types for database query results
+type QueryResult = Record<string, unknown>;
+type TableStructure = {
+	name: string;
+	columns: Array<{
+		name: string;
+		type: string;
+		nullable: boolean;
+		isPrimary: boolean;
+	}>;
+};
+type DatabaseSchema = {
+	tables: Record<string, TableStructure>;
+};
+
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld("electron", {
 	ipcRenderer: {
@@ -19,7 +34,7 @@ contextBridge.exposeInMainWorld("electron", {
 			const [channel, ...omit] = args;
 			return ipcRenderer.send(channel, ...omit);
 		},
-		invoke: (channel: string, args: any) => {
+		invoke: (channel: string, args: unknown) => {
 			const validChannels = [
 				"get-app-path",
 				"connect-to-db",
@@ -51,6 +66,82 @@ export type ConnectionConfig = {
 	database: string;
 	dbType: "mysql" | "postgres";
 };
+
+// Define the Database interface to ensure consistency
+interface Database {
+	connect: (id: string) => Promise<{ success: boolean; message: string }>;
+	disconnect: (id: string) => Promise<void>;
+	query: (id: string, sql: string) => Promise<QueryResult>;
+	getTables: (id: string) => Promise<string[]>;
+	getPrimaryKey: (id: string, tableName: string) => Promise<string[]>;
+	updateCell: (
+		id: string,
+		tableName: string,
+		primaryKeyColumn: string,
+		primaryKeyValue: string | number,
+		columnToUpdate: string,
+		newValue: unknown,
+	) => Promise<boolean>;
+	isConnected: (id: string) => Promise<boolean>;
+	getActiveConnections: () => Promise<string[]>;
+	getDatabaseSchema: (id: string) => Promise<DatabaseSchema>;
+	getTableStructure: (
+		connectionId: string,
+		tableName: string,
+	) => Promise<TableStructure>;
+	addRow: (
+		connectionId: string,
+		tableName: string,
+		data: Record<string, unknown>,
+	) => Promise<boolean>;
+}
+
+// Define the Store interface
+interface Store {
+	getConnections: () => Promise<Connection[]>;
+	addConnection: (connection: Connection) => Promise<Connection[]>;
+	deleteConnection: (id: string) => Promise<Connection[]>;
+	isConnected: (connectionId: string) => Promise<boolean>;
+	getActiveConnections: () => Promise<string[]>;
+	getSettings: () => Promise<AppSettings>;
+	updateSettings: (settings: AppSettings) => Promise<AppSettings>;
+	updateAISettings: (aiSettings: AISettings) => Promise<AISettings>;
+}
+
+// Define the WindowManager interface
+interface WindowManager {
+	openConnectionWindow: (
+		connectionId: string,
+		connectionName: string,
+		urlParams?: string,
+	) => Promise<{
+		success: boolean;
+		windowId?: number;
+		message?: string;
+	}>;
+	setMainWindowFullscreen: () => Promise<{
+		success: boolean;
+		message?: string;
+	}>;
+	focusConnectionWindow: (connectionId: string) => Promise<boolean>;
+	getCurrentWindowId: () => Promise<{
+		success: boolean;
+		windowId?: number;
+		message?: string;
+	}>;
+	setWindowFullscreen: (windowId: number) => Promise<{
+		success: boolean;
+		windowId?: number;
+		message?: string;
+	}>;
+}
+
+// Define the API interface
+interface API {
+	onWindowClosed: (callback: (connectionId: string) => void) => void;
+	offWindowClosed: () => void;
+	getOpenWindows: () => Promise<Record<string, boolean>>;
+}
 
 contextBridge.exposeInMainWorld("database", {
 	connect: (id: string) => {
@@ -109,16 +200,8 @@ contextBridge.exposeInMainWorld("database", {
 	addRow: (
 		connectionId: string,
 		tableName: string,
-		data: Record<string, any>,
+		data: Record<string, unknown>,
 	) => {
-		console.log(
-			"[Preload] addRow with ID:",
-			connectionId,
-			"table:",
-			tableName,
-			"data:",
-			data,
-		);
 		return ipcRenderer.invoke("db:addRow", connectionId, tableName, data);
 	},
 });
@@ -195,69 +278,9 @@ contextBridge.exposeInMainWorld("store", {
 // Type declarations for TypeScript
 declare global {
 	interface Window {
-		database: {
-			connect: (id: string) => Promise<{ success: boolean; message: string }>;
-			disconnect: (id: string) => Promise<void>;
-			query: (id: string, sql: string) => Promise<any>;
-			getTables: (id: string) => Promise<any[]>;
-			getPrimaryKey: (id: string, tableName: string) => Promise<string[]>;
-			updateCell: (
-				id: string,
-				tableName: string,
-				primaryKeyColumn: string,
-				primaryKeyValue: string | number,
-				columnToUpdate: string,
-				newValue: unknown,
-			) => Promise<boolean>;
-			isConnected: (id: string) => Promise<boolean>;
-			getActiveConnections: () => Promise<string[]>;
-			getDatabaseSchema: (id: string) => Promise<any>;
-			addRow: (
-				connectionId: string,
-				tableName: string,
-				data: Record<string, any>,
-			) => Promise<boolean>;
-		};
-		store: {
-			getConnections: () => Promise<Connection[]>;
-			addConnection: (connection: Connection) => Promise<Connection[]>;
-			deleteConnection: (id: string) => Promise<Connection[]>;
-			isConnected: (connectionId: string) => Promise<boolean>;
-			getActiveConnections: () => Promise<string[]>;
-			getSettings: () => Promise<AppSettings>;
-			updateSettings: (settings: AppSettings) => Promise<AppSettings>;
-			updateAISettings: (aiSettings: AISettings) => Promise<AISettings>;
-		};
-		windowManager: {
-			openConnectionWindow: (
-				connectionId: string,
-				connectionName: string,
-				urlParams?: string,
-			) => Promise<{
-				success: boolean;
-				windowId?: number;
-				message?: string;
-			}>;
-			setMainWindowFullscreen: () => Promise<{
-				success: boolean;
-				message?: string;
-			}>;
-			focusConnectionWindow: (connectionId: string) => Promise<boolean>;
-			getCurrentWindowId: () => Promise<{
-				success: boolean;
-				windowId?: number;
-				message?: string;
-			}>;
-			setWindowFullscreen: (windowId: number) => Promise<{
-				success: boolean;
-				windowId?: number;
-				message?: string;
-			}>;
-		};
-		api: {
-			onWindowClosed: (callback: (connectionId: string) => void) => void;
-			offWindowClosed: () => void;
-			getOpenWindows: () => Promise<Record<string, boolean>>;
-		};
+		database: Database;
+		store: Store;
+		windowManager: WindowManager;
+		api: API;
 	}
 }

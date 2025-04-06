@@ -86,14 +86,6 @@ electron.contextBridge.exposeInMainWorld("database", {
     return electron.ipcRenderer.invoke("db:getTableStructure", connectionId, tableName);
   },
   addRow: (connectionId, tableName, data) => {
-    console.log(
-      "[Preload] addRow with ID:",
-      connectionId,
-      "table:",
-      tableName,
-      "data:",
-      data
-    );
     return electron.ipcRenderer.invoke("db:addRow", connectionId, tableName, data);
   }
 });
