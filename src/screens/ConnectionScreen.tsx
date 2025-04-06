@@ -327,7 +327,7 @@ export function ConnectionScreen() {
 						size="sm"
 						onClick={handleSaveSettings}
 						disabled={isSaving}
-						className={`flex items-center gap-1.5 ${theme === "dark" ? "text-white" : "text-black"}`}
+						className="flex items-center gap-1.5"
 					>
 						{isSaving ? "Saving..." : "Save Changes"}
 					</Button>

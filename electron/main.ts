@@ -2,56 +2,10 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { storeService } from "./services/store";
+import WindowService from "./services/window.service";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname, "..");
-
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-	? path.join(process.env.APP_ROOT, "public")
-	: RENDERER_DIST;
-
-let win: BrowserWindow | null;
-
-// Track connection windows
-const connectionWindows: Record<string, BrowserWindow> = {};
-
-function createWindow() {
-	win = new BrowserWindow({
-		icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
-		width: 1200,
-		height: 800,
-		show: false, // Don't show until ready
-		webPreferences: {
-			preload: path.join(__dirname, "preload.mjs"),
-		},
-	});
-
-	// Wait for the window to be ready to show
-	win.once("ready-to-show", () => {
-		if (win) {
-			win.show();
-			// Don't set fullscreen by default for the main window
-			// as that might be disruptive on first launch
-		}
-	});
-
-	// Test active push message to Renderer-process.
-	win.webContents.on("did-finish-load", () => {
-		win?.webContents.send("main-process-message", new Date().toLocaleString());
-	});
-
-	if (VITE_DEV_SERVER_URL) {
-		win.loadURL(VITE_DEV_SERVER_URL);
-	} else {
-		// win.loadFile('dist/index.html')
-		win.loadFile(path.join(RENDERER_DIST, "index.html"));
-	}
-}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -59,78 +13,25 @@ function createWindow() {
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
 		app.quit();
-		win = null;
+		WindowService.win = null;
 	}
 });
 
 app.on("activate", () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
-		createWindow();
+		WindowService.createWindow();
 	}
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(WindowService.createWindow);
 
 // Function to create a new connection window
-function createConnectionWindow(connectionId: string) {
-	// Create a new browser window
-	const connectionWindow = new BrowserWindow({
-		icon: path.join(process.env.VITE_PUBLIC, "icon.png"),
-		width: 1200,
-		height: 800,
-		show: false, // Don't show until ready
-		webPreferences: {
-			preload: path.join(__dirname, "preload.mjs"),
-		},
-	});
-
-	// Load content into the window
-	if (VITE_DEV_SERVER_URL) {
-		connectionWindow
-			.loadURL(`${VITE_DEV_SERVER_URL}`)
-			.then(() => {
-				// Show window after content is loaded
-				connectionWindow.show();
-				// Force main window to stay focused
-				if (win && !win.isDestroyed()) {
-					win.focus();
-				}
-			})
-			.catch((err) =>
-				console.error("Failed to load URL in connection window:", err),
-			);
-	} else {
-		connectionWindow
-			.loadFile(path.join(RENDERER_DIST, "index.html"))
-			.then(() => {
-				// Show window after content is loaded
-				connectionWindow.show();
-				// Force main window to stay focused
-				if (win && !win.isDestroyed()) {
-					win.focus();
-				}
-			})
-			.catch((err) =>
-				console.error("Failed to load file in connection window:", err),
-			);
-	}
-
-	// Track window close for cleanup
-	connectionWindow.on("closed", () => {
-		delete connectionWindows[connectionId];
-	});
-
-	// Store the window reference
-	connectionWindows[connectionId] = connectionWindow;
-
-	return connectionWindow.id;
-}
 
 // IPC handler to open a new connection window
 ipcMain.handle("window:openConnectionWindow", async (_, connectionId) => {
 	try {
 		// Simply create a new window every time
-		const windowId = createConnectionWindow(connectionId);
+		const windowId = WindowService.createConnectionWindow(connectionId);
 		return { success: true, windowId };
 	} catch (error) {
 		console.error("Failed to open new window:", error);
@@ -144,125 +45,22 @@ ipcMain.handle("window:openConnectionWindow", async (_, connectionId) => {
 
 // IPC handler to focus an existing connection window
 ipcMain.handle("window:focusConnectionWindow", async (_, connectionId) => {
-	try {
-		if (
-			connectionWindows[connectionId] &&
-			!connectionWindows[connectionId].isDestroyed()
-		) {
-			connectionWindows[connectionId].focus();
-			return true;
-		}
-		return false;
-	} catch (error) {
-		console.error(
-			`Failed to focus window for connection ${connectionId}:`,
-			error,
-		);
-		return false;
-	}
+	WindowService.focusOnConnectionWindow(connectionId);
 });
 
 // IPC handler to get list of open windows
 ipcMain.handle("window:getOpenWindows", () => {
-	const openWindows: Record<string, boolean> = {};
-
-	// For each tracked connection window, check if it's still valid
-	for (const connectionId of Object.keys(connectionWindows)) {
-		try {
-			const windowExists =
-				connectionWindows[connectionId] &&
-				!connectionWindows[connectionId].isDestroyed();
-			openWindows[connectionId] = windowExists;
-
-			// Clean up tracking if window is destroyed
-			if (!windowExists) {
-				delete connectionWindows[connectionId];
-			}
-		} catch (error) {
-			console.error(`Error checking window status for ${connectionId}:`, error);
-			openWindows[connectionId] = false;
-			delete connectionWindows[connectionId];
-		}
-	}
-
-	return openWindows;
+	return WindowService.getOpenWindows();
 });
 
 // Add IPC handler to get current window ID
 ipcMain.handle("window:getCurrentWindowId", (event) => {
-	try {
-		const webContents = event.sender;
-		const win = BrowserWindow.fromWebContents(webContents);
-		if (win) {
-			return { success: true, windowId: win.id };
-		}
-		return {
-			success: false,
-			message: "Cannot find window for this webContents",
-		};
-	} catch (error) {
-		console.error("Failed to get current window ID:", error);
-		return {
-			success: false,
-			message:
-				error instanceof Error
-					? error.message
-					: "Unknown error getting window ID",
-		};
-	}
+	return WindowService.getCurrentWindowId(event);
 });
 
 // Update the existing fullscreen handler to accept a window ID
 ipcMain.handle("window:setWindowFullscreen", (_, windowId) => {
-	try {
-		let targetWindow: BrowserWindow | null = null;
-
-		// If no window ID is provided, use the main window
-		if (!windowId) {
-			targetWindow = win;
-		} else {
-			// Find window by ID
-			const allWindows = BrowserWindow.getAllWindows();
-			targetWindow = allWindows.find((w) => w.id === windowId) || null;
-		}
-
-		if (targetWindow && !targetWindow.isDestroyed()) {
-			targetWindow.setFullScreen(true);
-			return { success: true, windowId: targetWindow.id };
-		}
-
-		return { success: false, message: "Window not available" };
-	} catch (error) {
-		console.error("Failed to set window to fullscreen:", error);
-		return {
-			success: false,
-			message:
-				error instanceof Error
-					? error.message
-					: "Unknown error setting fullscreen",
-		};
-	}
-});
-
-// Keep the old handler for backward compatibility
-ipcMain.handle("window:setMainWindowFullscreen", () => {
-	try {
-		if (win && !win.isDestroyed()) {
-			win.setFullScreen(true);
-			return { success: true };
-		}
-
-		return { success: false, message: "Main window not available" };
-	} catch (error) {
-		console.error("Failed to set main window to fullscreen:", error);
-		return {
-			success: false,
-			message:
-				error instanceof Error
-					? error.message
-					: "Unknown error setting fullscreen",
-		};
-	}
+	WindowService.setWindowFullscreen(windowId);
 });
 
 // Connection management IPC handlers
@@ -327,39 +125,31 @@ ipcMain.handle("db:getTables", async (_, connectionId) => {
 });
 
 ipcMain.handle("db:getTableStructure", async (_, connectionId, tableName) => {
-	console.log(
-		"IPC: Getting table structure for table:",
-		tableName,
-		"connection:",
-		connectionId,
-	);
 	try {
 		const result = await storeService.getTableStructure(
 			connectionId,
 			tableName,
 		);
-		console.log("IPC: Got table structure:", result);
 		return result;
 	} catch (error) {
-		console.error("IPC: Error getting table structure:", error);
-		throw error;
+		throw new Error(
+			`Failed to get structure for table '${tableName}': ${
+				error instanceof Error ? error.message : "Unknown error"
+			}`,
+		);
 	}
 });
 
 ipcMain.handle("db:getPrimaryKey", async (_, connectionId, tableName) => {
-	console.log(
-		"IPC: Getting primary key for table:",
-		tableName,
-		"connection:",
-		connectionId,
-	);
 	try {
 		const result = await storeService.getPrimaryKey(connectionId, tableName);
-		console.log("IPC: Got primary keys:", result);
 		return result;
 	} catch (error) {
-		console.error("IPC: Error getting primary keys:", error);
-		throw error;
+		throw new Error(
+			`Failed to get primary key for table '${tableName}': ${
+				error instanceof Error ? error.message : "Unknown error"
+			}`,
+		);
 	}
 });
 
@@ -375,7 +165,6 @@ ipcMain.handle(
 		newValue,
 	) => {
 		try {
-			console.log("Print the connection id here:=======>", connectionId);
 			const result = await storeService.updateCell(
 				connectionId,
 				tableName,
@@ -384,11 +173,13 @@ ipcMain.handle(
 				columnToUpdate,
 				newValue,
 			);
-			console.log("IPC: Cell update result:", result);
 			return result;
 		} catch (error) {
-			console.error("IPC: Error updating cell:", error);
-			throw error;
+			throw new Error(
+				`Failed to update cell in table '${tableName}': ${
+					error instanceof Error ? error.message : "Unknown error"
+				}`,
+			);
 		}
 	},
 );
@@ -445,7 +236,6 @@ ipcMain.handle("stop-query", async (_, args) => {
 		const result = await storeService.cancelQuery(connectionId);
 		return { success: true, result };
 	} catch (error) {
-		console.error("Error cancelling query:", error);
 		return {
 			success: false,
 			message:
@@ -460,7 +250,6 @@ ipcMain.handle("save-query", async (_, args) => {
 		const result = await storeService.saveQuery(args);
 		return result;
 	} catch (error) {
-		console.error("Error saving query:", error);
 		return {
 			error: error instanceof Error ? error.message : "Failed to save query",
 		};
@@ -472,7 +261,6 @@ ipcMain.handle("get-saved-queries", async (_, args) => {
 		const result = await storeService.getSavedQueries(args.connectionId);
 		return result;
 	} catch (error) {
-		console.error("Error getting saved queries:", error);
 		return {
 			error:
 				error instanceof Error ? error.message : "Failed to get saved queries",
@@ -485,7 +273,6 @@ ipcMain.handle("delete-query", async (_, args) => {
 		const result = await storeService.deleteQuery(args.connectionId, args.name);
 		return result;
 	} catch (error) {
-		console.error("Error deleting query:", error);
 		return {
 			error: error instanceof Error ? error.message : "Failed to delete query",
 		};
@@ -499,7 +286,6 @@ ipcMain.handle(
 			connectionId,
 			forceRefresh,
 		);
-		console.log("Print the database type here=====>", data.dbType);
 		return data;
 	},
 );
@@ -608,32 +394,15 @@ ipcMain.handle("ai:generateQuery", async (_, args) => {
 	}
 });
 
-// Add a debug handler for API keys
-ipcMain.handle("debug:getAISettings", () => {
-	const settings = storeService.getSettings();
-	return {
-		hasSettings: !!settings,
-		hasAISection: !!settings?.ai,
-		openaiKeyPresent: !!settings?.ai?.openaiApiKey,
-		claudeKeyPresent: !!settings?.ai?.claudeApiKey,
-		// Add partial key info for verification without exposing full keys
-		openaiKeyPreview: settings?.ai?.openaiApiKey
-			? `${settings.ai.openaiApiKey.substring(0, 3)}...${settings.ai.openaiApiKey.substring(settings.ai.openaiApiKey.length - 4)}`
-			: null,
-		claudeKeyPreview: settings?.ai?.claudeApiKey
-			? `${settings.ai.claudeApiKey.substring(0, 3)}...${settings.ai.claudeApiKey.substring(settings.ai.claudeApiKey.length - 4)}`
-			: null,
-	};
-});
-
 ipcMain.handle("db:addRow", async (_, connectionId, tableName, data) => {
 	try {
-		console.log("IPC: Adding new row to table:", tableName, "data:", data);
 		const result = await storeService.addRow(connectionId, tableName, data);
-		console.log("IPC: Row addition result:", result);
 		return result;
 	} catch (error) {
-		console.error("IPC: Error adding new row:", error);
-		throw error;
+		throw new Error(
+			`Failed to add new row to table '${tableName}': ${
+				error instanceof Error ? error.message : "Unknown error"
+			}`,
+		);
 	}
 });
