@@ -17,6 +17,7 @@ function TablesScreenContent() {
 	} = useScreen();
 	const [isStandaloneWindow, setIsStandaloneWindow] = useState(false);
 	const [loadingConnection, setLoadingConnection] = useState(false);
+	const [connectionError, setConnectionError] = useState<string | null>(null);
 
 	const {
 		isLeftSidebarCollapsed,
@@ -26,9 +27,16 @@ function TablesScreenContent() {
 	} = useSidebar();
 
 	// Keyboard shortcuts for sidebar toggles
-	useHotkeys("mod+d", toggleLeftSidebar, { enableOnFormTags: true });
 	useHotkeys(
 		"mod+a",
+		(event) => {
+			event.preventDefault();
+			toggleLeftSidebar();
+		},
+		{ enableOnFormTags: true },
+	);
+	useHotkeys(
+		"mod+d",
 		(event) => {
 			event.preventDefault(); // Prevent default browser select all
 			toggleRightSidebar();
@@ -42,47 +50,60 @@ function TablesScreenContent() {
 			const isSecondary = window.opener !== null || window.name === "secondary";
 			setIsStandaloneWindow(isSecondary);
 
-			// If we don't have an active connection but have URL params, try to connect using them
-			if (!activeConnectionId) {
+			let connId = activeConnectionId;
+			let connName = activeConnectionName;
+
+			// If we don't have an active connection, try to get it from URL params
+			if (!connId) {
+				const params = new URLSearchParams(window.location.search);
+				connId = params.get("connectionId");
+				connName = params.get("connectionName");
+
+				if (connId) {
+					// Set the connection details from URL
+					setActiveConnectionId(connId);
+					if (connName) setActiveConnectionName(connName);
+				} else if (isSecondary) {
+					// Standalone window without connection params should close
+					window.close();
+					return;
+				} else {
+					// Main window without connection should go to connection screen
+					setCurrentScreen("connection");
+					return;
+				}
+			}
+
+			// Now attempt to connect to the database
+			if (connId) {
+				setLoadingConnection(true);
+				setConnectionError(null);
+
 				try {
-					const params = new URLSearchParams(window.location.search);
-					const connId = params.get("connectionId");
-					const connName = params.get("connectionName");
+					console.log("Connecting to database:", connId);
+					const result = await window.database.connect(connId);
 
-					if (connId) {
-						setLoadingConnection(true);
-						console.log(
-							"Recovering connection from URL params:",
-							connId,
-							connName,
-						);
+					if (!result?.success) {
+						const errorMessage = result?.message || "Unknown connection error";
+						console.error("Connection failed:", errorMessage);
+						setConnectionError(errorMessage);
 
-						// Set the connection details from URL
-						setActiveConnectionId(connId);
-						if (connName) setActiveConnectionName(connName);
-
-						// Attempt to connect to the database
-						const result = await window.database.connect(connId);
-
-						if (!result?.success && !result?.connected) {
-							console.error("Failed to recover connection:", result?.message);
-							// If in standalone window and connection fails, close the window
-							if (isSecondary) {
-								window.close();
-							} else {
-								setCurrentScreen("connection");
-							}
+						// If in standalone window and connection fails, close the window
+						if (isSecondary) {
+							window.close();
 						}
-					} else if (isSecondary) {
-						// Standalone window without connection params should close
-						window.close();
+					} else {
+						console.log("Successfully connected to database:", connId);
+						setConnectionError(null);
 					}
 				} catch (error) {
-					console.error("Error recovering connection:", error);
+					console.error("Error connecting to database:", error);
+					setConnectionError(
+						error instanceof Error ? error.message : "Unknown connection error",
+					);
+
 					if (isSecondary) {
 						window.close();
-					} else {
-						setCurrentScreen("connection");
 					}
 				} finally {
 					setLoadingConnection(false);
@@ -93,6 +114,7 @@ function TablesScreenContent() {
 		initializeConnection();
 	}, [
 		activeConnectionId,
+		activeConnectionName,
 		setActiveConnectionId,
 		setActiveConnectionName,
 		setCurrentScreen,
@@ -126,6 +148,28 @@ function TablesScreenContent() {
 					<p className="text-sm text-muted-foreground">
 						Connecting to database...
 					</p>
+				</div>
+			</div>
+		);
+	}
+
+	if (connectionError) {
+		return (
+			<div className="h-screen w-screen flex items-center justify-center bg-background text-foreground">
+				<div className="flex flex-col items-center text-center max-w-md p-6">
+					<div className="text-destructive mb-4">
+						<X className="size-12 mx-auto" />
+					</div>
+					<h2 className="text-xl font-medium mb-2">Connection Failed</h2>
+					<p className="text-sm text-muted-foreground mb-4">
+						{connectionError}
+					</p>
+					<Button
+						variant="default"
+						onClick={() => setCurrentScreen("connection")}
+					>
+						Return to Connections
+					</Button>
 				</div>
 			</div>
 		);
@@ -166,16 +210,6 @@ function TablesScreenContent() {
 			</Button>
 
 			<span className="h-5 w-px bg-muted mx-1" />
-
-			<Button
-				variant="ghost"
-				size="sm"
-				onClick={handleDisconnect}
-				className="text-sm"
-			>
-				<X className="size-4 mr-1.5" />
-				Disconnect
-			</Button>
 		</div>
 	);
 

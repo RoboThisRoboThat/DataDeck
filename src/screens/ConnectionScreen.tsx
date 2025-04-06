@@ -6,7 +6,7 @@ import { FiDatabase } from "react-icons/fi";
 import { Button } from "../components/ui/button";
 import { Layout } from "../components/Layout";
 import type { Connection } from "../types/connection";
-import { ConnectionType, DATABASE_TYPE_MAP } from "../types/connection";
+import { DATABASE_TYPE_MAP } from "../types/connection";
 import { useSettings } from "../context/SettingsContext";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -165,62 +165,55 @@ export function ConnectionScreen() {
 				throw new Error("Connection ID is empty");
 			}
 
-			// First, connect to the database
-			const result = await window.database.connect(connectionId);
+			console.log("Setting connection:", connectionId);
 
-			if (result?.success) {
-				console.log("Successfully connected to database:", connectionId);
+			// Set the connection ID in context first
+			setActiveConnectionId(connectionId);
+			setActiveConnectionName(connection.name);
 
-				// Set the connection ID in context
-				setActiveConnectionId(connectionId);
-				setActiveConnectionName(connection.name);
-				try {
-					await window.windowManager.setMainWindowFullscreen();
-				} catch (error) {
-					console.error("Failed to set fullscreen:", error);
-				}
-
-				// Open a new window
-				try {
-					console.log("Opening new window for connection:", connectionId);
-					const windowResult = await window.windowManager.openConnectionWindow(
-						connectionId,
-						connection.name,
-					);
-
-					if (windowResult?.success) {
-						console.log("Successfully opened new window");
-					} else {
-						console.error("Failed to open window:", windowResult?.message);
-					}
-				} catch (error) {
-					console.error("Error opening window:", error);
-				}
-
-				// Clear any previous errors
-				setError("");
-
-				// Show success notification
-				setNotification("Connected to database. A new window has been opened.");
-				setTimeout(() => setNotification(""), 5000);
-
-				// Navigate to tables screen immediately
-				setCurrentScreen("tables");
-
-				// Set the query parameters with connectionId and connectionName
-				const urlParams = new URLSearchParams(window.location.search);
-				urlParams.set("connectionId", connectionId);
-				urlParams.set("connectionName", connection.name);
-				const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-				window.history.replaceState(null, "", newUrl);
-			} else {
-				const errorMessage = result?.message || "Unknown connection error";
-				console.error("Connection failed:", errorMessage);
-				setError(errorMessage);
+			try {
+				await window.windowManager.setMainWindowFullscreen();
+			} catch (error) {
+				console.error("Failed to set fullscreen:", error);
 			}
+
+			// Open a new window
+			try {
+				console.log("Opening new window for connection:", connectionId);
+				const windowResult = await window.windowManager.openConnectionWindow(
+					connectionId,
+					connection.name,
+				);
+
+				if (windowResult?.success) {
+					console.log("Successfully opened new window");
+				} else {
+					console.error("Failed to open window:", windowResult?.message);
+				}
+			} catch (error) {
+				console.error("Error opening window:", error);
+			}
+
+			// Clear any previous errors
+			setError("");
+
+			// Show notification
+			setNotification("Opening connection. Please wait...");
+
+			// Set the query parameters with connectionId and connectionName
+			const urlParams = new URLSearchParams(window.location.search);
+			urlParams.set("connectionId", connectionId);
+			urlParams.set("connectionName", connection.name);
+			const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+			window.history.replaceState(null, "", newUrl);
+
+			// Navigate to tables screen immediately, connection will happen there
+			setCurrentScreen("tables");
 		} catch (error) {
-			console.error("Failed to connect:", error);
-			setError(error instanceof Error ? error.message : "Failed to connect");
+			console.error("Failed to set connection:", error);
+			setError(
+				error instanceof Error ? error.message : "Failed to set connection",
+			);
 		}
 	};
 

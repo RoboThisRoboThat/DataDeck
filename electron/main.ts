@@ -64,6 +64,20 @@ ipcMain.handle("window:setWindowFullscreen", (_, windowId) => {
 ipcMain.handle("db:connect", async (_, connectionId) => {
 	try {
 		console.log("Main process: connecting to DB with ID:", connectionId);
+
+		// Check if already connected
+		const isAlreadyConnected = storeService.isConnected(connectionId);
+
+		// If already connected, return success immediately
+		if (isAlreadyConnected) {
+			console.log("Connection already active:", connectionId);
+			return {
+				success: true,
+				message: "Already connected",
+			};
+		}
+
+		// Otherwise attempt a new connection
 		const result = await storeService.connectToDb(connectionId);
 		console.log("Main process: connection result:", result);
 		return result;
@@ -189,7 +203,8 @@ ipcMain.handle("store:getConnections", () => {
 	// Migrate existing connections without dbType by setting them to MySQL
 	const migratedConnections = connections.map((conn) => {
 		if (!conn.dbType) {
-			return { ...conn, dbType: "mysql" as const };
+			// Create a new object with all properties from conn plus dbType
+			return Object.assign({}, conn, { dbType: "mysql" as const });
 		}
 		return conn;
 	});
