@@ -6,7 +6,7 @@ import {
 	type ReactNode,
 } from "react";
 
-type Screen = "connection" | "tables" | "query";
+type Screen = "connection" | "tables" | "query" | "redis";
 
 interface ScreenContextType {
 	currentScreen: Screen;
@@ -15,6 +15,8 @@ interface ScreenContextType {
 	setActiveConnectionId: (id: string | null) => void;
 	activeConnectionName: string | null;
 	setActiveConnectionName: (name: string | null) => void;
+	activeConnectionType: string | null;
+	setActiveConnectionType: (type: string | null) => void;
 }
 
 const ScreenContext = createContext<ScreenContextType | undefined>(undefined);
@@ -27,30 +29,46 @@ export function ScreenProvider({ children }: { children: ReactNode }) {
 	const [activeConnectionName, setActiveConnectionName] = useState<
 		string | null
 	>(null);
+	const [activeConnectionType, setActiveConnectionType] = useState<
+		string | null
+	>(null);
 
 	useEffect(() => {
 		if (!activeConnectionId || !activeConnectionName) {
 			const urlParams = new URLSearchParams(window.location.search);
 			const connId = urlParams.get("connectionId");
 			const connName = urlParams.get("connectionName");
+			const connType = urlParams.get("connectionType");
+
 			if (connId) {
 				setActiveConnectionId(connId);
 			}
 			if (connName) {
 				setActiveConnectionName(connName);
 			}
+			if (connType) {
+				setActiveConnectionType(connType);
+			}
 		}
 	}, [activeConnectionId, activeConnectionName]);
 
 	useEffect(() => {
+		// Only automatically navigate to tables screen if we're not on the redis screen
+		// and the connection is not a redis connection
 		if (
 			activeConnectionId &&
 			activeConnectionName &&
-			currentScreen === "connection"
+			currentScreen === "connection" &&
+			activeConnectionType !== "redis"
 		) {
 			setCurrentScreen("tables");
 		}
-	}, [activeConnectionId, activeConnectionName, currentScreen]);
+	}, [
+		activeConnectionId,
+		activeConnectionName,
+		currentScreen,
+		activeConnectionType,
+	]);
 
 	return (
 		<ScreenContext.Provider
@@ -61,6 +79,8 @@ export function ScreenProvider({ children }: { children: ReactNode }) {
 				setActiveConnectionId,
 				activeConnectionName,
 				setActiveConnectionName,
+				activeConnectionType,
+				setActiveConnectionType,
 			}}
 		>
 			{children}

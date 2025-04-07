@@ -19,8 +19,12 @@ type TabType = "connections" | "settings";
 export function ConnectionScreen() {
 	const { settings, updateAISettings, isLoading } = useSettings();
 	const { toast } = useToast();
-	const { setCurrentScreen, setActiveConnectionId, setActiveConnectionName } =
-		useScreen();
+	const {
+		setCurrentScreen,
+		setActiveConnectionId,
+		setActiveConnectionName,
+		setActiveConnectionType,
+	} = useScreen();
 	const [connections, setConnections] = useState<Connection[]>([]);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState<TabType>("connections");
@@ -167,9 +171,10 @@ export function ConnectionScreen() {
 
 			console.log("Setting connection:", connectionId);
 
-			// Set the connection ID in context first
+			// Set the connection ID and type in context first
 			setActiveConnectionId(connectionId);
 			setActiveConnectionName(connection.name);
+			setActiveConnectionType(connection.dbType);
 
 			try {
 				await window.windowManager.setMainWindowFullscreen();
@@ -204,11 +209,17 @@ export function ConnectionScreen() {
 			const urlParams = new URLSearchParams(window.location.search);
 			urlParams.set("connectionId", connectionId);
 			urlParams.set("connectionName", connection.name);
+			urlParams.set("connectionType", connection.dbType);
 			const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
 			window.history.replaceState(null, "", newUrl);
 
-			// Navigate to tables screen immediately, connection will happen there
-			setCurrentScreen("tables");
+			// Navigate to the appropriate screen based on connection type
+			if (connection.dbType === "redis") {
+				setCurrentScreen("redis");
+			} else {
+				// Navigate to tables screen for all other connection types
+				setCurrentScreen("tables");
+			}
 		} catch (error) {
 			console.error("Failed to set connection:", error);
 			setError(

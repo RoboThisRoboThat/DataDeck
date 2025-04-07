@@ -2,6 +2,7 @@ import Store from "electron-store";
 import type { Connection } from "../../src/types/connection";
 import type { AppSettings, AISettings } from "../../src/types/settings";
 import DatabaseService from "./database.service";
+import redisService from "./redis.service";
 
 // Define TableSchema interface
 interface TableSchemaColumn {
@@ -147,6 +148,8 @@ const settingsStore = new Store<SettingsSchema>({
 
 // Map to store active database service instances
 const activeConnections = new Map<string, DatabaseService>();
+// Track Redis connections separately
+const activeRedisConnections = new Set<string>();
 
 export const storeService = {
 	getConnections: () => {
@@ -193,45 +196,144 @@ export const storeService = {
 		const connections = connectionStore.get("connections");
 		const connection = connections.find((conn) => conn.id === id);
 
-		if (connection) {
-			// Create a new service instance for this connection
-			const dbService = new DatabaseService(connection.dbType);
-
-			// Attempt to connect
-			const result = await dbService.connect({
-				host: connection.host,
-				port: connection.port,
-				user: connection.user,
-				password: connection.password,
-				database: connection.database,
-				dbType: connection.dbType,
-			});
-
-			if (result.success) {
-				// Store the active service if successful
-				activeConnections.set(id, dbService);
-
-				// Return a plain object (not a service instance)
-				return {
-					...connection,
-					connected: true,
-					success: true,
-					message: result.message,
-				};
-			}
-
+		if (!connection) {
 			return {
-				...connection,
-				connected: false,
 				success: false,
-				message: result.message,
+				message: "Connection not found",
+				connected: false,
 			};
 		}
 
+		// Create a base result object with consistent properties
+		const baseResult = {
+			id: connection.id,
+			name: connection.name,
+			dbType: connection.dbType,
+		};
+
+		// Handle Redis connections differently
+		if (connection.dbType === "redis") {
+			console.log("Print the database type here=====>", connection.dbType);
+
+			try {
+				// Use Redis service for Redis connections
+				const result = await redisService.connect(id, connection);
+
+				if (result.success) {
+					// Track active Redis connections
+					activeRedisConnections.add(id);
+
+					return {
+						...baseResult,
+						connected: true,
+						success: true,
+						message: result.message,
+					};
+				}
+
+				return {
+					...baseResult,
+					connected: false,
+					success: false,
+					message: result.message,
+				};
+			} catch (error) {
+				console.error("Error connecting to Redis:", error);
+				return {
+					...baseResult,
+					connected: false,
+					success: false,
+					message:
+						error instanceof Error
+							? error.message
+							: "Unknown Redis connection error",
+				};
+			}
+		}
+
+		if (connection.dbType === "mysql" || connection.dbType === "postgres") {
+			// For SQL connections, use the DatabaseService
+			const dbService = new DatabaseService(connection.dbType);
+
+			// Safely check for required SQL properties
+			const host = "host" in connection ? connection.host : undefined;
+			const port = "port" in connection ? connection.port : undefined;
+			const user = "user" in connection ? connection.user : undefined;
+			const password =
+				"password" in connection ? connection.password : undefined;
+			const database =
+				"database" in connection ? connection.database : undefined;
+
+			// Verify all required properties exist
+			if (!host || !port || !user || password === undefined || !database) {
+				return {
+					...baseResult,
+					connected: false,
+					success: false,
+					message: "Invalid SQL connection configuration",
+				};
+			}
+
+			// Attempt to connect
+			try {
+				const result = await dbService.connect({
+					host,
+					port,
+					user,
+					password,
+					database,
+					dbType: connection.dbType,
+				});
+
+				if (result.success) {
+					// Store the active service if successful
+					activeConnections.set(id, dbService);
+
+					// Return a plain object (not a service instance)
+					return {
+						...baseResult,
+						connected: true,
+						success: true,
+						message: result.message,
+					};
+				}
+
+				return {
+					...baseResult,
+					connected: false,
+					success: false,
+					message: result.message,
+				};
+			} catch (error) {
+				console.error("Error connecting to SQL database:", error);
+				return {
+					...baseResult,
+					connected: false,
+					success: false,
+					message:
+						error instanceof Error
+							? error.message
+							: "Unknown SQL connection error",
+				};
+			}
+		}
+
+		if (connection.dbType === "mongodb") {
+			// MongoDB connections are not yet fully implemented
+			return {
+				...baseResult,
+				connected: false,
+				success: false,
+				message: "MongoDB connections are not fully implemented yet",
+			};
+		}
+
+		// Handle unknown connection types
 		return {
-			success: false,
-			message: "Connection not found",
+			...baseResult,
 			connected: false,
+			success: false,
+			message: `Unsupported connection type: ${connection.dbType}`,
 		};
 	},
 
@@ -316,12 +418,17 @@ export const storeService = {
 
 	// Get active connection status
 	isConnected(connectionId: string) {
-		return activeConnections.has(connectionId);
+		return (
+			activeConnections.has(connectionId) ||
+			activeRedisConnections.has(connectionId)
+		);
 	},
 
 	// Get all active connections
 	getActiveConnections() {
-		return Array.from(activeConnections.keys());
+		const sqlConnections = Array.from(activeConnections.keys());
+		const redisConnections = Array.from(activeRedisConnections);
+		return [...sqlConnections, ...redisConnections];
 	},
 
 	// Query management functions
@@ -438,6 +545,25 @@ export const storeService = {
 
 	// Database operations
 	disconnectFromDb: async (connectionId: string) => {
+		// Check if it's a Redis connection
+		if (activeRedisConnections.has(connectionId)) {
+			try {
+				await redisService.disconnect(connectionId);
+				activeRedisConnections.delete(connectionId);
+				return { success: true };
+			} catch (error) {
+				console.error("Redis disconnect error:", error);
+				return {
+					success: false,
+					message:
+						error instanceof Error
+							? error.message
+							: "Unknown Redis disconnection error",
+				};
+			}
+		}
+
+		// Handle SQL connections as before
 		const service = activeConnections.get(connectionId);
 		if (service) {
 			await service.disconnect();

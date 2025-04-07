@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { storeService } from "./services/store";
 import WindowService from "./services/window.service";
+import redisService from "./services/redis.service";
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -408,5 +409,163 @@ ipcMain.handle("db:addRow", async (_, connectionId, tableName, data) => {
 				error instanceof Error ? error.message : "Unknown error"
 			}`,
 		);
+	}
+});
+
+// Add Redis IPC handlers
+ipcMain.handle("redis:connect", async (_, args) => {
+	const { connectionId, config } = args;
+	try {
+		return await redisService.connect(connectionId, config);
+	} catch (error) {
+		console.error("Redis connect error:", error);
+		return {
+			success: false,
+			message:
+				error instanceof Error
+					? error.message
+					: "Unknown Redis connection error",
+		};
+	}
+});
+
+ipcMain.handle("redis:disconnect", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.disconnect(connectionId);
+	} catch (error) {
+		console.error("Redis disconnect error:", error);
+		return {
+			success: false,
+			message:
+				error instanceof Error
+					? error.message
+					: "Unknown Redis disconnection error",
+		};
+	}
+});
+
+ipcMain.handle("redis:getKeys", async (_, args) => {
+	const { connectionId, pattern, cursor, count } = args;
+	try {
+		return await redisService.getKeys(connectionId, pattern, cursor, count);
+	} catch (error) {
+		console.error("Redis getKeys error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getKeyInfo", async (_, args) => {
+	const { connectionId, key } = args;
+	try {
+		return await redisService.getKeyInfo(connectionId, key);
+	} catch (error) {
+		console.error("Redis getKeyInfo error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getKeyValue", async (_, args) => {
+	const { connectionId, key } = args;
+	try {
+		return await redisService.getKeyValue(connectionId, key);
+	} catch (error) {
+		console.error("Redis getKeyValue error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:deleteKey", async (_, args) => {
+	const { connectionId, key } = args;
+	try {
+		return await redisService.deleteKey(connectionId, key);
+	} catch (error) {
+		console.error("Redis deleteKey error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:executeCommand", async (_, args) => {
+	const { connectionId, command, args: commandArgs } = args;
+	try {
+		return await redisService.executeCommand(
+			connectionId,
+			command,
+			commandArgs,
+		);
+	} catch (error) {
+		console.error("Redis executeCommand error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getServerInfo", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.getServerInfo(connectionId);
+	} catch (error) {
+		console.error("Redis getServerInfo error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getClients", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.getClients(connectionId);
+	} catch (error) {
+		console.error("Redis getClients error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:setKeyValue", async (_, args) => {
+	const { connectionId, key, value, type } = args;
+	try {
+		return await redisService.setKeyValue(connectionId, key, value, type);
+	} catch (error) {
+		console.error("Redis setKeyValue error:", error);
+		throw error;
+	}
+});
+
+// Add new IPC handlers for Redis database selection
+ipcMain.handle("redis:selectDatabase", async (_, args) => {
+	const { connectionId, dbNumber } = args;
+	try {
+		return await redisService.selectDatabase(connectionId, dbNumber);
+	} catch (error) {
+		console.error("Redis selectDatabase error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getDatabaseCount", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.getDatabaseCount(connectionId);
+	} catch (error) {
+		console.error("Redis getDatabaseCount error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getCurrentDatabase", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.getCurrentDatabase(connectionId);
+	} catch (error) {
+		console.error("Redis getCurrentDatabase error:", error);
+		throw error;
+	}
+});
+
+ipcMain.handle("redis:getPopulatedDatabases", async (_, args) => {
+	const { connectionId } = args;
+	try {
+		return await redisService.getPopulatedDatabases(connectionId);
+	} catch (error) {
+		console.error("Redis getPopulatedDatabases error:", error);
+		throw error;
 	}
 });

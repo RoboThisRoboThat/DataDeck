@@ -14,6 +14,8 @@ function TablesScreenContent() {
 		activeConnectionName,
 		setActiveConnectionId,
 		setActiveConnectionName,
+		activeConnectionType,
+		setActiveConnectionType,
 	} = useScreen();
 	const [isStandaloneWindow, setIsStandaloneWindow] = useState(false);
 	const [loadingConnection, setLoadingConnection] = useState(false);
@@ -52,17 +54,20 @@ function TablesScreenContent() {
 
 			let connId = activeConnectionId;
 			let connName = activeConnectionName;
+			let connType = activeConnectionType;
 
 			// If we don't have an active connection, try to get it from URL params
 			if (!connId) {
 				const params = new URLSearchParams(window.location.search);
 				connId = params.get("connectionId");
 				connName = params.get("connectionName");
+				connType = params.get("connectionType");
 
 				if (connId) {
 					// Set the connection details from URL
 					setActiveConnectionId(connId);
 					if (connName) setActiveConnectionName(connName);
+					if (connType) setActiveConnectionType(connType);
 				} else if (isSecondary) {
 					// Standalone window without connection params should close
 					window.close();
@@ -72,6 +77,13 @@ function TablesScreenContent() {
 					setCurrentScreen("connection");
 					return;
 				}
+			}
+
+			// Don't attempt to connect if it's a Redis connection
+			if (connType === "redis") {
+				// Redirect to Redis screen
+				setCurrentScreen("redis");
+				return;
 			}
 
 			// Now attempt to connect to the database
@@ -118,6 +130,8 @@ function TablesScreenContent() {
 		setActiveConnectionId,
 		setActiveConnectionName,
 		setCurrentScreen,
+		activeConnectionType,
+		setActiveConnectionType,
 	]);
 
 	const handleDisconnect = async () => {

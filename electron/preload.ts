@@ -143,6 +143,58 @@ interface API {
 	getOpenWindows: () => Promise<Record<string, boolean>>;
 }
 
+// Define Redis interface
+interface Redis {
+	connect: (
+		connectionId: string,
+		config: any,
+	) => Promise<{ success: boolean; message: string }>;
+	disconnect: (
+		connectionId: string,
+	) => Promise<{ success: boolean; message?: string }>;
+	getKeys: (
+		connectionId: string,
+		pattern?: string,
+		cursor?: string,
+		count?: number,
+	) => Promise<{ keys: string[]; cursor: string }>;
+	getKeyInfo: (
+		connectionId: string,
+		key: string,
+	) => Promise<{ type: string; ttl: number; size: number }>;
+	getKeyValue: (
+		connectionId: string,
+		key: string,
+	) => Promise<{ type: string; value: any }>;
+	deleteKey: (connectionId: string, key: string) => Promise<boolean>;
+	executeCommand: (
+		connectionId: string,
+		command: string,
+		args: string[],
+	) => Promise<any>;
+	getServerInfo: (connectionId: string) => Promise<any>;
+	getClients: (connectionId: string) => Promise<any[]>;
+	setKeyValue: (
+		connectionId: string,
+		key: string,
+		value: any,
+		type: string,
+	) => Promise<boolean>;
+	selectDatabase: (
+		connectionId: string,
+		dbNumber: number,
+	) => Promise<{ success: boolean; message: string }>;
+	getDatabaseCount: (
+		connectionId: string,
+	) => Promise<{ success: boolean; count: number; message?: string }>;
+	getCurrentDatabase: (
+		connectionId: string,
+	) => Promise<{ success: boolean; db: number; message?: string }>;
+	getPopulatedDatabases: (
+		connectionId: string,
+	) => Promise<{ success: boolean; databases: number[]; message?: string }>;
+}
+
 contextBridge.exposeInMainWorld("database", {
 	connect: (id: string) => {
 		console.log("[Preload] connect with ID:", id);
@@ -275,6 +327,123 @@ contextBridge.exposeInMainWorld("store", {
 		ipcRenderer.invoke("store:updateAISettings", aiSettings),
 });
 
+// Add Redis API
+contextBridge.exposeInMainWorld("redis", {
+	connect: (connectionId: string, config: any) => {
+		console.log("[Preload] Redis connect with ID:", connectionId);
+		return ipcRenderer.invoke("redis:connect", { connectionId, config });
+	},
+	disconnect: (connectionId: string) => {
+		console.log("[Preload] Redis disconnect with ID:", connectionId);
+		return ipcRenderer.invoke("redis:disconnect", { connectionId });
+	},
+	getKeys: (connectionId: string, pattern = "*", cursor = "0", count = 100) => {
+		console.log(
+			"[Preload] Redis getKeys with ID:",
+			connectionId,
+			"pattern:",
+			pattern,
+		);
+		return ipcRenderer.invoke("redis:getKeys", {
+			connectionId,
+			pattern,
+			cursor,
+			count,
+		});
+	},
+	getKeyInfo: (connectionId: string, key: string) => {
+		console.log(
+			"[Preload] Redis getKeyInfo with ID:",
+			connectionId,
+			"key:",
+			key,
+		);
+		return ipcRenderer.invoke("redis:getKeyInfo", { connectionId, key });
+	},
+	getKeyValue: (connectionId: string, key: string) => {
+		console.log(
+			"[Preload] Redis getKeyValue with ID:",
+			connectionId,
+			"key:",
+			key,
+		);
+		return ipcRenderer.invoke("redis:getKeyValue", { connectionId, key });
+	},
+	deleteKey: (connectionId: string, key: string) => {
+		console.log(
+			"[Preload] Redis deleteKey with ID:",
+			connectionId,
+			"key:",
+			key,
+		);
+		return ipcRenderer.invoke("redis:deleteKey", { connectionId, key });
+	},
+	executeCommand: (connectionId: string, command: string, args: string[]) => {
+		console.log(
+			"[Preload] Redis executeCommand with ID:",
+			connectionId,
+			"command:",
+			command,
+		);
+		return ipcRenderer.invoke("redis:executeCommand", {
+			connectionId,
+			command,
+			args,
+		});
+	},
+	getServerInfo: (connectionId: string) => {
+		console.log("[Preload] Redis getServerInfo with ID:", connectionId);
+		return ipcRenderer.invoke("redis:getServerInfo", { connectionId });
+	},
+	getClients: (connectionId: string) => {
+		console.log("[Preload] Redis getClients with ID:", connectionId);
+		return ipcRenderer.invoke("redis:getClients", { connectionId });
+	},
+	setKeyValue: (
+		connectionId: string,
+		key: string,
+		value: any,
+		type: string,
+	) => {
+		console.log(
+			"[Preload] Redis setKeyValue with ID:",
+			connectionId,
+			"key:",
+			key,
+		);
+		return ipcRenderer.invoke("redis:setKeyValue", {
+			connectionId,
+			key,
+			value,
+			type,
+		});
+	},
+	selectDatabase: (connectionId: string, dbNumber: number) => {
+		console.log(
+			"[Preload] Redis selectDatabase with ID:",
+			connectionId,
+			"dbNumber:",
+			dbNumber,
+		);
+		return ipcRenderer.invoke("redis:selectDatabase", {
+			connectionId,
+			dbNumber,
+		});
+	},
+	getDatabaseCount: (connectionId: string) => {
+		console.log("[Preload] Redis getDatabaseCount with ID:", connectionId);
+		return ipcRenderer.invoke("redis:getDatabaseCount", { connectionId });
+	},
+	getCurrentDatabase: (connectionId: string) => {
+		console.log("[Preload] Redis getCurrentDatabase with ID:", connectionId);
+		return ipcRenderer.invoke("redis:getCurrentDatabase", { connectionId });
+	},
+	getPopulatedDatabases: (connectionId: string) => {
+		console.log("[Preload] Redis getPopulatedDatabases with ID:", connectionId);
+		return ipcRenderer.invoke("redis:getPopulatedDatabases", { connectionId });
+	},
+});
+
 // Type declarations for TypeScript
 declare global {
 	interface Window {
@@ -282,5 +451,6 @@ declare global {
 		store: Store;
 		windowManager: WindowManager;
 		api: API;
+		redis: Redis;
 	}
 }

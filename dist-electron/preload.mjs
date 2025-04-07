@@ -144,3 +144,113 @@ electron.contextBridge.exposeInMainWorld("store", {
   updateSettings: (settings) => electron.ipcRenderer.invoke("store:updateSettings", settings),
   updateAISettings: (aiSettings) => electron.ipcRenderer.invoke("store:updateAISettings", aiSettings)
 });
+electron.contextBridge.exposeInMainWorld("redis", {
+  connect: (connectionId, config) => {
+    console.log("[Preload] Redis connect with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:connect", { connectionId, config });
+  },
+  disconnect: (connectionId) => {
+    console.log("[Preload] Redis disconnect with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:disconnect", { connectionId });
+  },
+  getKeys: (connectionId, pattern = "*", cursor = "0", count = 100) => {
+    console.log(
+      "[Preload] Redis getKeys with ID:",
+      connectionId,
+      "pattern:",
+      pattern
+    );
+    return electron.ipcRenderer.invoke("redis:getKeys", {
+      connectionId,
+      pattern,
+      cursor,
+      count
+    });
+  },
+  getKeyInfo: (connectionId, key) => {
+    console.log(
+      "[Preload] Redis getKeyInfo with ID:",
+      connectionId,
+      "key:",
+      key
+    );
+    return electron.ipcRenderer.invoke("redis:getKeyInfo", { connectionId, key });
+  },
+  getKeyValue: (connectionId, key) => {
+    console.log(
+      "[Preload] Redis getKeyValue with ID:",
+      connectionId,
+      "key:",
+      key
+    );
+    return electron.ipcRenderer.invoke("redis:getKeyValue", { connectionId, key });
+  },
+  deleteKey: (connectionId, key) => {
+    console.log(
+      "[Preload] Redis deleteKey with ID:",
+      connectionId,
+      "key:",
+      key
+    );
+    return electron.ipcRenderer.invoke("redis:deleteKey", { connectionId, key });
+  },
+  executeCommand: (connectionId, command, args) => {
+    console.log(
+      "[Preload] Redis executeCommand with ID:",
+      connectionId,
+      "command:",
+      command
+    );
+    return electron.ipcRenderer.invoke("redis:executeCommand", {
+      connectionId,
+      command,
+      args
+    });
+  },
+  getServerInfo: (connectionId) => {
+    console.log("[Preload] Redis getServerInfo with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:getServerInfo", { connectionId });
+  },
+  getClients: (connectionId) => {
+    console.log("[Preload] Redis getClients with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:getClients", { connectionId });
+  },
+  setKeyValue: (connectionId, key, value, type) => {
+    console.log(
+      "[Preload] Redis setKeyValue with ID:",
+      connectionId,
+      "key:",
+      key
+    );
+    return electron.ipcRenderer.invoke("redis:setKeyValue", {
+      connectionId,
+      key,
+      value,
+      type
+    });
+  },
+  selectDatabase: (connectionId, dbNumber) => {
+    console.log(
+      "[Preload] Redis selectDatabase with ID:",
+      connectionId,
+      "dbNumber:",
+      dbNumber
+    );
+    return electron.ipcRenderer.invoke("redis:selectDatabase", {
+      connectionId,
+      dbNumber
+    });
+  },
+  getDatabaseCount: (connectionId) => {
+    console.log("[Preload] Redis getDatabaseCount with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:getDatabaseCount", { connectionId });
+  },
+  getCurrentDatabase: (connectionId) => {
+    console.log("[Preload] Redis getCurrentDatabase with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:getCurrentDatabase", { connectionId });
+  },
+  getPopulatedDatabases: (connectionId) => {
+    console.log("[Preload] Redis getPopulatedDatabases with ID:", connectionId);
+    return electron.ipcRenderer.invoke("redis:getPopulatedDatabases", { connectionId });
+  }
+});
