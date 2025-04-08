@@ -229,7 +229,7 @@ function TablesScreenContent() {
 
 	return (
 		<Layout
-			showThemeToggle={false}
+			showThemeToggle={true}
 			title={
 				<div className="flex items-center gap-2">
 					<Database className="size-4 text-primary" />

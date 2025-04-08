@@ -727,7 +727,7 @@ ${insertStatements.join("\n")}`;
 								<TabsTrigger
 									key={result.id}
 									value={index.toString()}
-									className="flex items-center gap-2 py-1.5 px-3 h-9 rounded-sm rounded-b-none border-border border-b-0 data-[state=active]:bg-background data-[state=active]:border data-[state=active]:border-b-0 data-[state=active]:border-t-2 data-[state=active]:border-t-primary relative group"
+									className="flex items-center gap-2 py-1.5 px-3 h-9 rounded-sm rounded-b-none border-border border-b-0 data-[state=active]:bg-background dark:data-[state=active]:bg-gray-900 data-[state=active]:border data-[state=active]:border-b-0 data-[state=active]:border-t-2 data-[state=active]:border-t-primary relative group"
 								>
 									<div className="flex items-center">
 										{result.status === "running" ? (
@@ -738,12 +738,12 @@ ${insertStatements.join("\n")}`;
 											<FiCheckCircle className="text-primary size-3.5 mr-2" />
 										)}
 
-										<span className="max-w-[150px] truncate text-xs font-medium">
+										<span className="max-w-[150px] truncate text-xs font-medium text-foreground dark:text-gray-200">
 											{displayQuery}
 										</span>
 
 										{result.executionTime ? (
-											<span className="text-xs text-muted-foreground font-mono ml-2">
+											<span className="text-xs text-muted-foreground dark:text-gray-400 font-mono ml-2">
 												{formatExecutionTime(result.executionTime)}
 											</span>
 										) : null}
@@ -752,7 +752,7 @@ ${insertStatements.join("\n")}`;
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-5 w-5 p-0 absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity"
+										className="h-5 w-5 p-0 absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 dark:hover:bg-gray-800"
 										onClick={(e) => {
 											e.stopPropagation();
 
@@ -775,7 +775,7 @@ ${insertStatements.join("\n")}`;
 											}
 										}}
 									>
-										<IoClose className="size-3" />
+										<IoClose className="size-3 text-gray-500 dark:text-gray-400" />
 									</Button>
 								</TabsTrigger>
 							);
@@ -935,7 +935,7 @@ ${insertStatements.join("\n")}`;
 		<div className="flex h-full overflow-hidden">
 			{/* Sidebar with dynamic width */}
 			<div
-				className="flex-none border-r border-gray-200 bg-white overflow-auto"
+				className="flex-none border-r border-gray-200 bg-white dark:bg-gray-600 overflow-auto"
 				style={{ width: `${sidebarWidth}px` }}
 			>
 				<Sidebar
@@ -954,7 +954,7 @@ ${insertStatements.join("\n")}`;
 
 			{/* Resizer */}
 			<div
-				className="w-1.5 hover:w-2 bg-gray-200 relative cursor-col-resize hover:bg-indigo-400 active:bg-indigo-500 transition-all duration-200 flex items-center justify-center"
+				className="w-1.5 hover:w-2 bg-gray-200 dark:bg-gray-700 relative cursor-col-resize hover:bg-indigo-400 active:bg-indigo-00 transition-all duration-200 flex items-center justify-center"
 				onMouseDown={startResizing}
 				onDoubleClick={handleDoubleClick}
 			>
@@ -967,13 +967,13 @@ ${insertStatements.join("\n")}`;
 			</div>
 
 			{/* Main Content Area */}
-			<div className="flex-1 flex bg-gray-100 overflow-hidden">
+			<div className="flex-1 flex bg-gray-100 dark:bg-gray-900 overflow-hidden">
 				{/* Content Container with no max-width */}
-				<div className="w-full flex flex-col overflow-hidden bg-white">
+				<div className="w-full flex flex-col overflow-hidden bg-white dark:bg-gray-900">
 					{/* Header with actions */}
-					<div className="border-b border-gray-200 shadow-sm flex-none">
+					<div className="border-b border-gray-200 dark:border-gray-700 shadow-sm flex-none">
 						<div className="flex justify-between items-center p-2">
-							<h2 className="text-gray-800 font-semibold text-lg">
+							<h2 className="text-gray-800 dark:text-white font-semibold text-lg">
 								SQL Query Editor
 							</h2>
 
@@ -998,7 +998,7 @@ ${insertStatements.join("\n")}`;
 													size="sm"
 													onClick={() => executeQuery(false)}
 													disabled={!sql.trim()}
-													className="bg-indigo-600 hover:bg-indigo-700 shadow-md"
+													className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 text-white dark:text-gray-100 shadow-md"
 												>
 													<FiPlay className="mr-1 h-4 w-4" />
 													Execute
@@ -1017,7 +1017,7 @@ ${insertStatements.join("\n")}`;
 													variant="destructive"
 													size="sm"
 													onClick={stopExecution}
-													className="shadow-md"
+													className="shadow-md dark:bg-red-700 dark:hover:bg-red-800 dark:text-gray-100"
 												>
 													<FiStopCircle className="mr-1 h-4 w-4" />
 													Stop
@@ -1038,7 +1038,7 @@ ${insertStatements.join("\n")}`;
 													size="sm"
 													onClick={() => executeQuery(true)}
 													disabled={isExecuting}
-													className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+													className="border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
 												>
 													<FiChevronRight className="mr-1 h-4 w-4" />
 													Run Selection
@@ -1060,7 +1060,7 @@ ${insertStatements.join("\n")}`;
 												size="sm"
 												onClick={openSaveModal}
 												disabled={!sql.trim() || isExecuting}
-												className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+												className="border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
 											>
 												<FiSave className="mr-1 h-4 w-4" />
 												Save
@@ -1079,7 +1079,7 @@ ${insertStatements.join("\n")}`;
 												size="icon"
 												onClick={copyQuery}
 												disabled={!sql.trim() || isExecuting}
-												className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8"
+												className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 h-8 w-8"
 											>
 												<FiCopy className="h-4 w-4" />
 											</Button>
@@ -1101,7 +1101,7 @@ ${insertStatements.join("\n")}`;
 													activeResultIndex === null ||
 													!queryResults[activeResultIndex]?.data.length
 												}
-												className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 h-8 w-8"
+												className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 h-8 w-8"
 											>
 												<FiDownload className="h-4 w-4" />
 											</Button>
@@ -1153,7 +1153,7 @@ ${insertStatements.join("\n")}`;
 						</div>
 
 						{/* Results area with minimal margin */}
-						<div className="flex flex-col h-[calc(100vh-500px)] min-h-[400px] m-1 mt-2 overflow-hidden border border-gray-200 rounded-md shadow-sm bg-white">
+						<div className="flex flex-col h-[calc(100vh-500px)] min-h-[400px] m-1 mt-2 overflow-hidden border border-gray-200 rounded-md shadow-sm bg-white dark:bg-gray-900">
 							{/* Result tabs - Fixed */}
 							<div className="flex-none border-b border-gray-200">
 								{renderResultTabs()}

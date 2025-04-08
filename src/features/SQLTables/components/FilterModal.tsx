@@ -155,18 +155,21 @@ const FilterModal = ({
 
 	return (
 		<Dialog open={open} onOpenChange={() => onClose()}>
-			<DialogContent className="sm:max-w-md rounded-lg overflow-hidden">
-				<DialogHeader className="bg-blue-50 -mx-6 -mt-4 px-6 py-4 border-b border-blue-100">
-					<DialogTitle className="flex items-center justify-between text-blue-800">
+			<DialogContent className="sm:max-w-md rounded-lg overflow-hidden bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+				<DialogHeader className="bg-blue-50 dark:bg-blue-900/30 -mx-6 -mt-4 px-6 py-4 border-b border-blue-100 dark:border-blue-900/50">
+					<DialogTitle className="flex items-center justify-between text-blue-800 dark:text-blue-300">
 						<div className="flex items-center gap-2">
-							<FiFilter className="text-blue-600" size={18} />
+							<FiFilter
+								className="text-blue-600 dark:text-blue-400"
+								size={18}
+							/>
 							<span className="font-medium">Filter Data</span>
 						</div>
 					</DialogTitle>
 				</DialogHeader>
 
 				<div className="pt-5 pb-3 px-1 space-y-6">
-					<p className="text-sm text-gray-600">
+					<p className="text-sm text-gray-600 dark:text-gray-400">
 						Select a column and filter condition. Some operators require an
 						additional value.
 					</p>
@@ -175,9 +178,9 @@ const FilterModal = ({
 						<div>
 							<Label
 								htmlFor="filter-column"
-								className="text-sm font-medium mb-1.5 block text-gray-700"
+								className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300"
 							>
-								Column<span className="text-red-500">*</span>
+								Column<span className="text-red-500 dark:text-red-400">*</span>
 							</Label>
 							<Select
 								inputId="filter-column"
@@ -194,30 +197,67 @@ const FilterModal = ({
 												? "#f87171"
 												: state.isFocused
 													? "#3b82f6"
-													: "#d1d5db",
+													: "#374151",
 										boxShadow: state.isFocused ? "0 0 0 1px #3b82f6" : "none",
 										"&:hover": {
 											borderColor: state.isFocused ? "#3b82f6" : "#60a5fa",
 										},
-										backgroundColor: "white",
+										backgroundColor: "rgb(17 24 39)",
 										borderRadius: "0.375rem",
 										minHeight: "38px",
+										color: "white",
 									}),
 									menu: (baseStyles) => ({
 										...baseStyles,
 										zIndex: 50,
+										backgroundColor: "rgb(17 24 39)",
+									}),
+									option: (baseStyles, state) => ({
+										...baseStyles,
+										backgroundColor: state.isFocused
+											? "rgb(55 65 81)"
+											: "rgb(17 24 39)",
+										color: "white",
+										":active": {
+											backgroundColor: "rgb(55 65 81)",
+										},
+									}),
+									singleValue: (baseStyles) => ({
+										...baseStyles,
+										color: "white",
+									}),
+									input: (baseStyles) => ({
+										...baseStyles,
+										color: "white",
 									}),
 								}}
+								theme={(theme) => ({
+									...theme,
+									colors: {
+										...theme.colors,
+										neutral0: "rgb(17 24 39)",
+										neutral20: "#374151",
+										neutral30: "#4B5563",
+										neutral40: "#6B7280",
+										neutral50: "#9CA3AF",
+										neutral60: "#D1D5DB",
+										neutral70: "#E5E7EB",
+										neutral80: "#F3F4F6",
+										neutral90: "#F9FAFB",
+									},
+								})}
 							/>
 							{!column && error && (
-								<p className="text-xs mt-1.5 text-red-500">{error}</p>
+								<p className="text-xs mt-1.5 text-red-500 dark:text-red-400">
+									{error}
+								</p>
 							)}
 						</div>
 
 						<div>
 							<Label
 								htmlFor="filter-operator"
-								className="text-sm font-medium mb-1.5 block text-gray-700"
+								className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300"
 							>
 								Operator
 							</Label>
@@ -227,13 +267,17 @@ const FilterModal = ({
 							>
 								<SelectTrigger
 									id="filter-operator"
-									className="bg-white border border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+									className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors text-gray-900 dark:text-gray-100"
 								>
 									<SelectValue placeholder="Select operator" />
 								</SelectTrigger>
-								<SelectContent className="max-h-60">
+								<SelectContent className="max-h-60 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
 									{FILTER_OPERATORS.map((op) => (
-										<SelectItem key={op} value={op}>
+										<SelectItem
+											key={op}
+											value={op}
+											className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+										>
 											{FILTER_OPERATOR_LABELS[op]}
 										</SelectItem>
 									))}
@@ -245,7 +289,7 @@ const FilterModal = ({
 							<div>
 								<Label
 									htmlFor="filter-value"
-									className="text-sm font-medium mb-1.5 block text-gray-700"
+									className="text-sm font-medium mb-1.5 block text-gray-700 dark:text-gray-300"
 								>
 									Value
 								</Label>
@@ -254,30 +298,38 @@ const FilterModal = ({
 									value={value}
 									onChange={(e) => setValue(e.target.value)}
 									placeholder={getPlaceholder()}
-									className={`bg-white border ${error ? "border-red-500 focus:ring-red-500" : "border-gray-300 hover:border-blue-400 focus:border-blue-500 focus:ring-blue-500"} transition-colors`}
+									className={`bg-white dark:bg-gray-800 border ${
+										error
+											? "border-red-500 dark:border-red-600 focus:ring-red-500 dark:focus:ring-red-600"
+											: "border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+									} transition-colors text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500`}
 									autoFocus
 								/>
 								{getHelperText() && (
 									<p
-										className={`text-xs mt-1.5 ${error ? "text-red-500" : "text-gray-500"}`}
+										className={`text-xs mt-1.5 ${
+											error
+												? "text-red-500 dark:text-red-400"
+												: "text-gray-500 dark:text-gray-400"
+										}`}
 									>
 										{getHelperText()}
 									</p>
 								)}
 							</div>
 						) : (
-							<div className="p-3.5 bg-gray-50 rounded-md border border-gray-200 text-gray-600 text-sm mt-2">
+							<div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm mt-2">
 								This operator doesn't require a value.
 							</div>
 						)}
 					</div>
 				</div>
 
-				<DialogFooter className="flex justify-between bg-gray-50 -mx-6 -mb-4 px-6 py-4 border-t border-gray-200">
+				<DialogFooter className="flex justify-between bg-gray-50 dark:bg-gray-800 -mx-6 -mb-4 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
 					<Button
 						onClick={handleClear}
 						variant="outline"
-						className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+						className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-300 hover:border-red-300 dark:hover:border-red-800 transition-colors"
 					>
 						Clear Filter
 					</Button>
@@ -286,14 +338,14 @@ const FilterModal = ({
 						<Button
 							onClick={onClose}
 							variant="outline"
-							className="text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+							className="text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
 						>
 							Cancel
 						</Button>
 						<Button
 							onClick={handleApply}
 							disabled={requiresValue(operator) && !value.trim()}
-							className="bg-blue-600 hover:bg-blue-700 text-white transition-colors font-medium px-4"
+							className="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white transition-colors font-medium px-4 disabled:bg-blue-400 dark:disabled:bg-blue-800"
 						>
 							Apply
 						</Button>

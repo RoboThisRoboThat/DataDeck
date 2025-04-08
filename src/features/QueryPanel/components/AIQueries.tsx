@@ -47,6 +47,27 @@ interface TableSchema {
 	}>;
 }
 
+interface DatabaseResponse {
+	data: Array<{
+		name: string;
+		columns: Array<{
+			name: string;
+			type: string;
+			length?: number;
+			precision?: number;
+			isPrimary: boolean;
+			isNullable: boolean;
+			defaultValue?: string;
+		}>;
+		foreignKeys: Array<{
+			column: string;
+			referencedTable: string;
+			referencedColumn: string;
+		}>;
+	}>;
+	dbType: string;
+}
+
 const AVAILABLE_MODELS: ModelOption[] = [
 	// OpenAI models
 	{ id: "gpt-4o", name: "GPT-4o", provider: "gpt" },
@@ -92,25 +113,27 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 	);
 
 	// Load database schema
-	// Fetch the schema when the component mounts
 	useEffect(() => {
 		const fetchSchema = async () => {
 			try {
-				const { data: schema, dbType } =
+				const response: DatabaseResponse =
 					await window.database.getDatabaseSchema(connectionId);
 				// Map the schema from the database to match our component's expected interface
-				const mappedSchema = schema.map((table) => ({
+				const mappedSchema: TableSchema[] = response.data.map((table) => ({
 					name: table.name,
 					columns: table.columns.map((column) => ({
 						name: column.name,
 						type: column.type,
-						table: table.name, // Add the required table property
+						length: column.length,
+						precision: column.precision,
+						isPrimary: column.isPrimary,
+						isNullable: column.isNullable,
+						defaultValue: column.defaultValue,
 					})),
-					foreignKeys: table.foreignKeys || [], // Add the required foreignKeys property
+					foreignKeys: table.foreignKeys || [],
 				}));
 				setTableSchemas(mappedSchema);
-				setDatabaseType(dbType);
-
+				setDatabaseType(response.dbType);
 				setLoadingSchema(false);
 			} catch (error) {
 				console.error("Error fetching schema:", error);
@@ -198,9 +221,9 @@ const AIQueries = ({ connectionId }: AIQueriesProps) => {
 
 			// Add foreign keys if present
 			if (table.foreignKeys.length > 0) {
-				formattedSchema += "FOREIGN KEYS:\n";
+				formattedSchema += "\nFOREIGN KEYS:\n";
 				for (const fk of table.foreignKeys) {
-					formattedSchema += `- ${fk.column} → ${fk.referencedTable}.${fk.referencedColumn}\n`;
+					formattedSchema += `- ${fk.column} -> ${fk.referencedTable}.${fk.referencedColumn}\n`;
 				}
 			}
 		}
@@ -530,226 +553,115 @@ Please provide more details about what specific data you're looking for, and I'l
 	}
 
 	return (
-		<div className="flex flex-col h-full overflow-hidden">
-			{/* Header with model selector */}
-			<div className="p-4 border-b border-gray-200">
-				<div className="flex justify-between items-center">
-					<div className="flex items-center gap-3">
-						{/* Provider selector */}
-						<Tabs
-							value={activeProvider}
-							onValueChange={(value) =>
-								setActiveProvider(value as "gpt" | "claude")
-							}
-							className="w-auto"
+		<div className="flex flex-col h-full">
+			{/* Provider and Model Selection */}
+			<div className="flex items-center gap-4 p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+				<Tabs
+					value={activeProvider}
+					onValueChange={(value) =>
+						setActiveProvider(value as "gpt" | "claude")
+					}
+					className="w-[400px]"
+				>
+					<TabsList className="grid w-full grid-cols-2 bg-gray-100 dark:bg-gray-800">
+						<TabsTrigger
+							value="gpt"
+							disabled={!apiKeys.openai}
+							className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700"
 						>
-							<TabsList>
-								<TabsTrigger value="gpt" disabled={!apiKeys.openai}>
-									OpenAI
-								</TabsTrigger>
-								<TabsTrigger value="claude" disabled={!apiKeys.claude}>
-									Claude
-								</TabsTrigger>
-							</TabsList>
-						</Tabs>
+							OpenAI
+						</TabsTrigger>
+						<TabsTrigger
+							value="claude"
+							disabled={!apiKeys.claude}
+							className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700"
+						>
+							Anthropic
+						</TabsTrigger>
+					</TabsList>
+				</Tabs>
 
-						{/* Model selector */}
-						<Select value={selectedModelId} onValueChange={setSelectedModelId}>
-							<SelectTrigger className="w-[160px]">
-								<SelectValue placeholder="Select model" />
-							</SelectTrigger>
-							<SelectContent>
-								{availableModels.map((model) => (
-									<SelectItem key={model.id} value={model.id}>
-										{model.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-				</div>
+				<Select value={selectedModelId} onValueChange={setSelectedModelId}>
+					<SelectTrigger className="w-[200px] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+						<SelectValue placeholder="Select a model" />
+					</SelectTrigger>
+					<SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+						{availableModels.map((model) => (
+							<SelectItem
+								key={model.id}
+								value={model.id}
+								className="text-gray-900 dark:text-gray-100"
+							>
+								{model.name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 
-			{/* Messages container - scrollable area */}
-			<div className="flex-grow overflow-y-auto p-4">
-				{messages.length === 0 ? (
-					<div className="flex flex-col items-center justify-center h-full text-center">
-						<p className="text-gray-600 mb-1 font-medium">AI Query Assistant</p>
-						<p className="text-gray-500 max-w-xs mb-6">
-							I can help you write SQL queries for your{" "}
-							{databaseType.toUpperCase()} database. Just describe what you
-							need!
-						</p>
-
-						<div className="flex flex-col gap-2 w-full max-w-md">
-							<Button
-								variant="outline"
-								className="justify-between py-6"
-								onClick={() =>
-									setInputValue(
-										"Show me all users who signed up in the last week",
-									)
-								}
-							>
-								Show me all users who signed up in the last week
-								<FiArrowRight />
-							</Button>
-							<Button
-								variant="outline"
-								className="justify-between py-6"
-								onClick={() =>
-									setInputValue(
-										"Find orders with a total value greater than $100",
-									)
-								}
-							>
-								Find orders with a total value greater than $100
-								<FiArrowRight />
-							</Button>
-							<Button
-								variant="outline"
-								className="justify-between py-6"
-								onClick={() =>
-									setInputValue("Get top 10 products by quantity sold")
-								}
-							>
-								Get top 10 products by quantity sold
-								<FiArrowRight />
-							</Button>
-							<Button
-								variant="outline"
-								className="justify-between py-6"
-								onClick={() =>
-									setInputValue("Tell me all the tables that I have in my db")
-								}
-							>
-								Tell me all the tables that I have in my db
-								<FiArrowRight />
-							</Button>
+			{/* Messages Container */}
+			<div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+				{messages.map((message) => (
+					<div
+						key={message.id}
+						className={`flex ${
+							message.role === "assistant" ? "justify-start" : "justify-end"
+						}`}
+					>
+						<div
+							className={`max-w-[80%] rounded-lg p-4 ${
+								message.role === "assistant"
+									? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+									: "bg-blue-600 dark:bg-blue-700 text-white"
+							} ${message.pending ? "opacity-70" : ""}`}
+						>
+							<pre className="whitespace-pre-wrap font-sans">
+								{message.content}
+							</pre>
 						</div>
 					</div>
-				) : (
-					<div className="space-y-4">
-						{messages.map((message) => (
-							<div
-								key={message.id}
-								className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-							>
-								<div
-									className={`max-w-3/4 px-4 py-3 rounded-lg ${
-										message.role === "user"
-											? "bg-primary text-primary-foreground"
-											: "bg-muted border border-border"
-									}`}
-								>
-									{message.pending ? (
-										<div className="flex items-center space-x-2">
-											<div className="w-2 h-2 rounded-full bg-current animate-bounce" />
-											<div
-												className="w-2 h-2 rounded-full bg-current animate-bounce"
-												style={{ animationDelay: "0.2s" }}
-											/>
-											<div
-												className="w-2 h-2 rounded-full bg-current animate-bounce"
-												style={{ animationDelay: "0.4s" }}
-											/>
-										</div>
-									) : (
-										<div className="whitespace-pre-wrap">
-											{message.content.includes("```sql") ? (
-												<>
-													{message.content.split("```sql")[0]}
-													<div className="my-2 bg-gray-800 text-white p-3 rounded-md overflow-auto relative">
-														<pre>
-															<code className="language-sql">
-																{
-																	message.content
-																		.split("```sql")[1]
-																		.split("```")[0]
-																}
-															</code>
-														</pre>
-														<Button
-															variant="ghost"
-															size="sm"
-															className="absolute top-2 right-2 h-7 text-xs"
-															onClick={() =>
-																handleCopyQuery(
-																	message.content
-																		.split("```sql")[1]
-																		.split("```")[0],
-																)
-															}
-														>
-															Copy
-														</Button>
-													</div>
-													{message.content.split("```")[2] || ""}
-												</>
-											) : (
-												message.content
-											)}
-										</div>
-									)}
-								</div>
-							</div>
-						))}
-						<div ref={messagesEndRef} />
-					</div>
-				)}
+				))}
+				<div ref={messagesEndRef} />
 			</div>
 
-			{/* Error message if any */}
+			{/* Error Message */}
 			{error && (
-				<div
-					className={`mx-4 mb-4 p-2 ${error.includes("copied") ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"} rounded-md border`}
-				>
-					<FiAlertCircle className="inline-block mr-2" />
-					{error}
+				<div className="p-4 bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-900/50">
+					<div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+						<FiAlertCircle className="shrink-0" />
+						<p className="text-sm">{error}</p>
+					</div>
 				</div>
 			)}
 
-			{/* Fixed input box at the bottom */}
-			<div className="p-4 border-t border-gray-200 bg-white shadow-md">
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						sendMessage();
-					}}
-					className="relative"
-				>
+			{/* Input Area */}
+			<div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+				<div className="flex gap-4">
 					<Textarea
 						ref={inputRef}
 						value={inputValue}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyDown}
-						placeholder="Describe the SQL query you need..."
-						className="resize-none min-h-[90px] max-h-[300px] px-4 py-3 pr-[60px] rounded-xl border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition-all duration-200"
-						disabled={isLoading}
-						style={{ overflowY: "auto" }}
+						placeholder="Ask me to help you write SQL queries..."
+						className="flex-1 resize-none bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+						rows={3}
 					/>
-					<div className="absolute bottom-3 right-3 flex gap-2">
-						{inputValue.trim().length > 0 && (
-							<Button
-								type="submit"
-								disabled={!inputValue.trim() || isLoading}
-								className="h-9 w-9 rounded-full bg-indigo-600 hover:bg-indigo-700 p-0 flex items-center justify-center shadow-md transition-all duration-200"
-							>
-								{isLoading ? (
-									<div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-								) : (
-									<FiSend className="h-4 w-4" />
-								)}
-							</Button>
+					<Button
+						onClick={sendMessage}
+						disabled={isLoading || !inputValue.trim()}
+						className={`shrink-0 self-end ${
+							isLoading
+								? "bg-blue-400 dark:bg-blue-600"
+								: "bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600"
+						}`}
+					>
+						{isLoading ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<FiSend className="h-4 w-4" />
 						)}
-					</div>
-					<div className="mt-2 flex justify-between items-center text-xs text-gray-500">
-						<span>Press Enter to send, Shift+Enter for new line</span>
-						<span className="text-right">
-							{inputValue.length > 0 ? `${inputValue.length} characters` : ""}
-						</span>
-					</div>
-				</form>
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

@@ -443,31 +443,52 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 				}
 
 				return (
-					<div key={column} className="mb-3 pb-3 border-b border-gray-100">
-						<h4 className="font-medium text-gray-700">{column}</h4>
+					<div
+						key={column}
+						className="mb-3 pb-3 border-b border-gray-100 dark:border-gray-800"
+					>
+						<h4 className="font-medium text-gray-700 dark:text-gray-300">
+							{column}
+						</h4>
 						<div className="grid grid-cols-2 gap-2 mt-1">
 							<div className="text-sm">
-								<span className="text-gray-500 block text-xs">Original:</span>
-								<div className="bg-gray-50 p-1 rounded mt-1 max-h-20 overflow-auto">
+								<span className="text-gray-500 dark:text-gray-400 block text-xs">
+									Original:
+								</span>
+								<div className="bg-gray-50 dark:bg-gray-800 p-1 rounded mt-1 max-h-20 overflow-auto">
 									{originalValue === null || originalValue === undefined ? (
-										<span className="text-gray-400 italic">NULL</span>
+										<span className="text-gray-400 dark:text-gray-500 italic">
+											NULL
+										</span>
 									) : isJsonValue(originalValue) ? (
-										<pre className="text-xs">{formattedOriginal}</pre>
+										<pre className="text-xs text-gray-700 dark:text-gray-300">
+											{formattedOriginal}
+										</pre>
 									) : (
-										formattedOriginal
+										<span className="text-gray-700 dark:text-gray-300">
+											{formattedOriginal}
+										</span>
 									)}
 								</div>
 							</div>
 							<div className="text-sm">
-								<span className="text-gray-500 block text-xs">New:</span>
-								<div className="bg-blue-50 p-1 rounded mt-1 max-h-20 overflow-auto">
+								<span className="text-gray-500 dark:text-gray-400 block text-xs">
+									New:
+								</span>
+								<div className="bg-blue-50 dark:bg-blue-900/20 p-1 rounded mt-1 max-h-20 overflow-auto">
 									{newValue === null ? (
-										<span className="text-gray-400 italic">NULL</span>
+										<span className="text-gray-400 dark:text-gray-500 italic">
+											NULL
+										</span>
 									) : isJsonValue(originalValue) &&
 										typeof newValue === "string" ? (
-										<pre className="text-xs">{newValue}</pre>
+										<pre className="text-xs text-gray-700 dark:text-gray-300">
+											{newValue}
+										</pre>
 									) : (
-										formattedNew
+										<span className="text-gray-700 dark:text-gray-300">
+											{formattedNew}
+										</span>
 									)}
 								</div>
 							</div>
@@ -672,12 +693,12 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 	return (
 		<div
-			className="w-72 min-w-72 bg-gray-50 border-l border-gray-200 flex flex-col overflow-hidden"
+			className="w-72 min-w-72 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
 			style={{ height: "calc(100% - 50px" }}
 		>
-			<div className="p-4 border-b border-gray-200 bg-gray-50">
+			<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
 				<div className="flex justify-between items-center mb-3">
-					<h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
 						Row Details
 					</h2>
 				</div>
@@ -686,7 +707,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 				<div className="relative flex items-center gap-2">
 					<div className="relative flex-1">
 						<FiSearch
-							className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+							className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
 							size={14}
 						/>
 						<Input
@@ -695,7 +716,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 							placeholder="Search columns..."
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-9 text-sm"
+							className="pl-9 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
 						/>
 					</div>
 
@@ -714,21 +735,27 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 									<Button
 										variant="outline"
 										size="sm"
-										className="w-9 h-9 p-0 rounded-full"
+										className="w-9 h-9 p-0 rounded-full border-gray-300 dark:border-gray-600"
 									>
-										<FiMoreVertical className="text-gray-500" size={16} />
+										<FiMoreVertical
+											className="text-gray-500 dark:text-gray-400"
+											size={16}
+										/>
 									</Button>
 								</div>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent
 								align="end"
-								className="z-[100]"
+								className="z-[100] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
 								side="bottom"
 								sideOffset={5}
 								onClick={(e) => e.stopPropagation()}
 								onKeyDown={(e) => e.stopPropagation()}
 							>
-								<DropdownMenuItem onClick={() => setShowCopyRowModal(true)}>
+								<DropdownMenuItem
+									onClick={() => setShowCopyRowModal(true)}
+									className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+								>
 									<FiCopy className="mr-2 text-purple-500" size={16} />
 									Duplicate Row
 								</DropdownMenuItem>
@@ -739,14 +766,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			</div>
 
 			{!activeTable && (
-				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 text-center">
+				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 dark:text-gray-400 text-center">
 					<FiDatabase className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">Select a table to view row details</p>
 				</div>
 			)}
 
 			{activeTable && !hasSelectedRowData && (
-				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 text-center">
+				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 dark:text-gray-400 text-center">
 					<FiAlertCircle className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">
 						Click on a row in the table to view its details
@@ -769,21 +796,21 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 									return (
 										<div
 											key={column}
-											className="space-y-1 pb-2 border-b border-gray-100 mb-2"
+											className="space-y-1 pb-2 border-b border-gray-100 dark:border-gray-700 mb-2"
 										>
 											<div className="flex justify-between items-center">
 												<label
 													htmlFor={`field-${column}`}
-													className="text-xs font-medium text-gray-700"
+													className="text-xs font-medium text-gray-700 dark:text-gray-300"
 													title={column} // Show full column name on hover
 												>
 													{truncatedColumnName}
 													{isPrimaryKey(column) && (
-														<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
+														<span className="ml-1 text-xs bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded">
 															PK
 														</span>
 													)}
-													<span className="ml-1 text-xs bg-gray-200 text-gray-700 px-1 py-0.5 rounded">
+													<span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 py-0.5 rounded">
 														({columnType || "N/A"})
 													</span>
 												</label>
@@ -791,21 +818,24 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 													<Button
 														variant="ghost"
 														size="sm"
-														className="h-6 w-6 p-0"
+														className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
 														onClick={() => handleOpenJsonModal(column)}
 														title="Edit in full-screen"
 													>
-														<FiEdit size={14} className="text-blue-500" />
+														<FiEdit
+															size={14}
+															className="text-blue-500 dark:text-blue-400"
+														/>
 													</Button>
 												)}
 											</div>
 
 											{isNull ? (
-												<div className="w-full px-3 py-2 border border-gray-300 bg-gray-50 rounded-md text-sm text-gray-400 italic">
+												<div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-400 dark:text-gray-500 italic">
 													NULL
 												</div>
 											) : inputType === "json" ? (
-												<div className="h-36 border border-blue-300 rounded-md overflow-hidden">
+												<div className="h-36 border border-blue-300 dark:border-blue-600 rounded-md overflow-hidden">
 													<Editor
 														height="100%"
 														language="json"
@@ -826,8 +856,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 															automaticLayout: true,
 															wordWrap: "on",
 															readOnly: !canEdit,
+															theme: "vs-dark",
 														}}
-														theme="vs"
 													/>
 												</div>
 											) : inputType === "date" ||
@@ -850,12 +880,12 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 																: undefined
 														}
 														className={`w-full px-3 py-2 border rounded-md text-sm
-														${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
-														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 bg-orange-50" : ""}
+														${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20" : ""}
 													`}
 													/>
 													{!isValidDate(value) && !(column in editedValues) && (
-														<div className="text-xs text-orange-600 mt-1">
+														<div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
 															Invalid date format. Edit to fix.
 														</div>
 													)}
@@ -877,7 +907,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 															: undefined
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
 												`}
 												/>
 											) : (
@@ -897,7 +927,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 															: undefined
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 bg-white" : "border-gray-300 bg-gray-50"}
+													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
 												`}
 												/>
 											)}
@@ -909,10 +939,10 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 						{/* Fixed save button at the bottom */}
 						{primaryKeys.length > 0 && (
-							<div className="sticky bottom-0 p-3 bg-gray-50 border-t border-gray-200 flex justify-center">
+							<div className="sticky bottom-0 p-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center">
 								<Button
 									variant="default"
-									className="w-full"
+									className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
 									onClick={handleSaveClick}
 									disabled={!hasChanges() || loading}
 								>
@@ -934,21 +964,21 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					}
 				}}
 			>
-				<DialogContent className="sm:max-w-md">
+				<DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
 					<DialogHeader>
-						<DialogTitle className="bg-gray-50 -mx-6 -mt-4 px-6 py-3 border-b">
+						<DialogTitle className="bg-gray-50 dark:bg-gray-800 -mx-6 -mt-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
 							{error ? "Error" : "Confirm Changes"}
 						</DialogTitle>
 					</DialogHeader>
 
 					<div className="py-4">
 						{error ? (
-							<div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+							<div className="p-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm">
 								{error}
 							</div>
 						) : (
 							<>
-								<h3 className="text-sm font-medium mb-3">
+								<h3 className="text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
 									The following fields will be updated:
 								</h3>
 
@@ -956,7 +986,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 									{hasChanges() ? (
 										renderChanges()
 									) : (
-										<p className="text-gray-500 text-center py-4">
+										<p className="text-gray-500 dark:text-gray-400 text-center py-4">
 											No changes detected
 										</p>
 									)}
@@ -965,7 +995,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 						)}
 					</div>
 
-					<DialogFooter className="bg-gray-50 px-6 py-4 -mx-6 -mb-6 border-t">
+					<DialogFooter className="bg-gray-50 dark:bg-gray-800 px-6 py-4 -mx-6 -mb-6 border-t border-gray-200 dark:border-gray-700">
 						<Button
 							variant="outline"
 							onClick={() => {
@@ -973,6 +1003,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 								setError(null); // Clear error when dialog is closed
 							}}
 							disabled={loading}
+							className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
 						>
 							{error ? "Close" : "Cancel"}
 						</Button>
@@ -980,7 +1011,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 							<Button
 								onClick={saveChanges}
 								disabled={!hasChanges() || loading}
-								className={loading ? "opacity-80" : ""}
+								className={`bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white ${loading ? "opacity-80" : ""}`}
 							>
 								{loading ? "Saving..." : "Save Changes"}
 							</Button>

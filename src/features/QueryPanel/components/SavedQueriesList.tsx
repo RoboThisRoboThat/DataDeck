@@ -12,7 +12,6 @@ import {
 	FiSearch,
 	FiAlertCircle,
 	FiClock,
-	FiEdit,
 } from "react-icons/fi";
 
 interface SavedQuery {
@@ -107,10 +106,10 @@ const SavedQueriesList = ({
 			<div className="p-4">
 				<div className="relative mb-4">
 					<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-						<FiSearch className="h-5 w-5 text-gray-400" />
+						<FiSearch className="h-5 w-5 text-gray-400 dark:text-gray-500" />
 					</div>
 					<input
-						className="bg-gray-100 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 pr-3 focus:ring-blue-500 focus:border-blue-500"
+						className="bg-gray-100 dark:bg-gray-800 block w-full pl-10 sm:text-sm border-gray-300 dark:border-gray-700 rounded-md py-2 pr-3 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-gray-100"
 						type="text"
 						placeholder="Search queries..."
 						disabled
@@ -120,10 +119,10 @@ const SavedQueriesList = ({
 				{[1, 2, 3].map((i) => (
 					<div
 						key={i}
-						className="mb-4 bg-white rounded p-3 border border-gray-200"
+						className="mb-4 bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700"
 					>
-						<Skeleton className="w-70 h-28" />
-						<Skeleton className="w-40 h-16 mt-2" />
+						<Skeleton className="w-70 h-28 bg-gray-200 dark:bg-gray-700" />
+						<Skeleton className="w-40 h-16 mt-2 bg-gray-200 dark:bg-gray-700" />
 					</div>
 				))}
 			</div>
@@ -134,7 +133,7 @@ const SavedQueriesList = ({
 	if (error) {
 		return (
 			<div className="p-4">
-				<div className="p-4 bg-red-50 text-red-700 flex items-start rounded border border-red-200">
+				<div className="p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 flex items-start rounded border border-red-200 dark:border-red-900/50">
 					<FiAlertCircle className="mr-2 mt-0.5 flex-shrink-0" />
 					<p className="text-sm">{error}</p>
 				</div>
@@ -147,11 +146,14 @@ const SavedQueriesList = ({
 		return (
 			<div className="p-4">
 				<div className="flex flex-col items-center justify-center py-8 text-center">
-					<FiDatabase size={36} className="text-gray-300 mb-3" />
-					<p className="text-gray-600 mb-1 font-medium">
+					<FiDatabase
+						size={36}
+						className="text-gray-300 dark:text-gray-600 mb-3"
+					/>
+					<p className="text-gray-600 dark:text-gray-300 mb-1 font-medium">
 						No saved queries found
 					</p>
-					<p className="text-gray-500 max-w-xs">
+					<p className="text-gray-500 dark:text-gray-400 max-w-xs">
 						Save a query using the save button to see it here.
 					</p>
 				</div>
@@ -165,10 +167,10 @@ const SavedQueriesList = ({
 			{/* Search input */}
 			<div className="relative mb-4">
 				<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-					<FiSearch className="h-5 w-5 text-gray-400" />
+					<FiSearch className="h-5 w-5 text-gray-400 dark:text-gray-500" />
 				</div>
 				<input
-					className="bg-gray-100 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 pr-3 focus:ring-blue-500 focus:border-blue-500"
+					className="bg-gray-100 dark:bg-gray-800 block w-full pl-10 sm:text-sm border-gray-300 dark:border-gray-700 rounded-md py-2 pr-3 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
 					type="text"
 					placeholder="Search queries..."
 					value={searchTerm}
@@ -177,7 +179,7 @@ const SavedQueriesList = ({
 			</div>
 
 			{filteredQueries.length === 0 && (
-				<p className="text-gray-500 py-4 text-center">
+				<p className="text-gray-500 dark:text-gray-400 py-4 text-center">
 					No queries match your search.
 				</p>
 			)}
@@ -194,59 +196,46 @@ const SavedQueriesList = ({
 							aria-pressed={isActive}
 							className={`w-full text-left overflow-hidden rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow ${
 								isActive
-									? "border-l-4 border-blue-500 bg-blue-50"
-									: "border border-gray-200 hover:border-blue-300"
+									? "border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+									: "border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
 							}`}
 						>
 							<div className="p-4">
-								<div className="flex items-center justify-between mb-2">
-									<div className="flex items-center space-x-3">
-										<div
-											className={`flex-shrink-0 ${isActive ? "text-blue-600" : "text-blue-500"}`}
-										>
-											{isActive ? (
-												<FiEdit size={18} />
-											) : (
-												<FiDatabase size={18} />
-											)}
-										</div>
-										<p
-											className={`font-medium text-base truncate max-w-[180px] ${isActive ? "text-blue-700" : "text-gray-800"}`}
-										>
+								<div className="flex items-start justify-between">
+									<div className="flex-1 min-w-0">
+										<h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
 											{query.name}
-										</p>
+										</h3>
+										{query.description && (
+											<p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+												{query.description}
+											</p>
+										)}
+										<div className="mt-2 flex items-center text-xs text-gray-500 dark:text-gray-400">
+											<FiClock className="mr-1.5 h-3 w-3 flex-shrink-0" />
+											{formatDate(query.createdAt)}
+										</div>
 									</div>
-
-									<TooltipProvider>
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<button
-													type="button"
-													onClick={(e) => handleDeleteQuery(query.name, e)}
-													className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
-												>
-													<FiTrash2 size={16} />
-												</button>
-											</TooltipTrigger>
-											<TooltipContent>
-												<p>Delete query</p>
-											</TooltipContent>
-										</Tooltip>
-									</TooltipProvider>
+									<div className="ml-4 flex-shrink-0 flex gap-2">
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<button
+														type="button"
+														onClick={(e) => handleDeleteQuery(query.name, e)}
+														className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+													>
+														<span className="sr-only">Delete query</span>
+														<FiTrash2 className="h-4 w-4" />
+													</button>
+												</TooltipTrigger>
+												<TooltipContent>
+													<p>Delete query</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
+									</div>
 								</div>
-
-								{query.description && (
-									<p className="text-sm text-gray-500 mb-2 line-clamp-2">
-										{query.description}
-									</p>
-								)}
-
-								{query.createdAt && (
-									<div className="flex items-center text-gray-400 mt-2">
-										<FiClock size={14} className="mr-1.5" />
-										<p className="text-xs">{formatDate(query.createdAt)}</p>
-									</div>
-								)}
 							</div>
 						</button>
 					);

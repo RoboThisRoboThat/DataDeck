@@ -93,13 +93,13 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 
 		return (
 			<div
-				className="w-64 min-w-64 bg-gray-50 border-r border-gray-200 flex flex-col"
+				className="w-64 min-w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col"
 				style={{
 					height: "calc(100% - 50px)",
 				}}
 			>
-				<div className="p-4 border-b border-gray-200 bg-gray-50">
-					<h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">
+				<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">
 						Tables
 					</h2>
 
@@ -113,9 +113,9 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 								onChange={(e) => setTableSearch(e.target.value)}
 								onKeyDown={handleInputKeyDown}
 								placeholder="Search tables..."
-								className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm 
+								className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm 
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                placeholder-gray-400"
+                placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
 							/>
 						</div>
 					</div>
@@ -129,9 +129,9 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 								key={table}
 								type="button"
 								className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors
-                ${openTables.includes(table) ? "text-blue-600" : "text-gray-700"}
-                ${activeTable === table ? "bg-blue-100 text-blue-700 font-semibold" : "hover:bg-gray-100"}
-                ${index === focusedIndex ? "ring-2 ring-blue-500 ring-offset-1 bg-blue-50" : ""}
+                ${openTables.includes(table) ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}
+                ${activeTable === table ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-700"}
+                ${index === focusedIndex ? "ring-2 ring-blue-500 ring-offset-1 bg-blue-50 dark:bg-blue-900/20" : ""}
                 focus:outline-none focus:ring-2 focus:ring-blue-500`}
 								onClick={() => handleTableSelect(table)}
 							>
@@ -141,7 +141,7 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 
 						{/* No Results Message */}
 						{filteredTables.length === 0 && (
-							<div className="text-center py-4 text-gray-500 text-sm">
+							<div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
 								No tables found matching "{tableSearch}"
 							</div>
 						)}

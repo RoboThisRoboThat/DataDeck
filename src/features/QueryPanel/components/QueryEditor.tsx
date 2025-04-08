@@ -7,6 +7,17 @@ import React, {
 import Editor from "@monaco-editor/react";
 import type { OnMount, OnChange, BeforeMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { useTheme } from "../../../context/ThemeContext";
+
+interface DatabaseSchema {
+	name: string;
+	columns: Array<{
+		name: string;
+		type: string;
+	}>;
+}
+
+type DatabaseResponse = DatabaseSchema | DatabaseSchema[];
 
 interface QueryEditorProps {
 	value: string;
@@ -144,20 +155,23 @@ const QueryEditor = forwardRef<EditorRefType, QueryEditorProps>(
 		const [monacoInstance, setMonacoInstance] = useState<typeof Monaco | null>(
 			null,
 		);
+		const { theme } = useTheme();
 
 		// Fetch the schema when the component mounts
 		useEffect(() => {
 			const fetchSchema = async () => {
 				try {
-					const { data: schema } =
-						await window.database.getDatabaseSchema(connectionId);
+					const response = (await window.database.getDatabaseSchema(
+						connectionId,
+					)) as unknown as DatabaseResponse;
+					const schema = Array.isArray(response) ? response : [response];
 					// Map the schema from the database to match our component's expected interface
 					const mappedSchema = schema.map((table) => ({
 						name: table.name,
 						columns: table.columns.map((column) => ({
 							name: column.name,
 							type: column.type,
-							table: table.name, // Add the required table property
+							table: table.name,
 						})),
 					}));
 					setTableSchemas(mappedSchema);
@@ -688,11 +702,27 @@ const QueryEditor = forwardRef<EditorRefType, QueryEditorProps>(
 						smoothScrolling: true,
 						padding: { top: 10 },
 						colorDecorators: true,
+						contextmenu: true,
+						scrollbar: {
+							verticalScrollbarSize: 12,
+							horizontalScrollbarSize: 12,
+							vertical: "visible",
+							horizontal: "visible",
+							verticalHasArrows: false,
+							horizontalHasArrows: false,
+							useShadows: true,
+						},
+						overviewRulerBorder: false,
+						renderLineHighlightOnlyWhenFocus: false,
+						occurrencesHighlight: "singleFile",
+						selectionHighlight: true,
+						lineHeight: 1.5,
+						letterSpacing: 0.5,
 					}}
-					theme="vs"
+					theme={theme === "dark" ? "vs-dark" : "light"}
 					loading={
-						<div className="flex items-center justify-center h-full w-full bg-gray-50">
-							<div className="text-gray-500">Loading SQL editor...</div>
+						<div className="flex items-center justify-center h-full w-full bg-background">
+							<div className="text-muted-foreground">Loading SQL editor...</div>
 						</div>
 					}
 				/>

@@ -394,7 +394,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 	// Render the table header
 	const renderTableHeader = () => (
-		<div className="sticky top-0 z-10 flex border-b border-gray-200 bg-gray-100 shadow-sm w-fit">
+		<div className="sticky top-0 z-10 flex border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 shadow-sm w-fit">
 			{columns.map((column) => {
 				const width = getCellWidth(column);
 				const isPrimaryKey = primaryKeys.includes(column);
@@ -404,8 +404,10 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 					<div
 						key={`header-${column}`}
 						className={`flex items-center justify-between px-3 py-3 font-medium relative ${
-							isPrimaryKey ? "bg-blue-50/70 text-blue-800" : "text-gray-700"
-						} ${isColumnSorted ? "bg-purple-50/80" : ""}`}
+							isPrimaryKey
+								? "bg-blue-50/70 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+								: "text-gray-700 dark:text-gray-300"
+						} ${isColumnSorted ? "bg-purple-50/80 dark:bg-purple-900/30" : ""}`}
 						style={{
 							width,
 							minWidth: width,
@@ -513,12 +515,12 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		return (
 			<div
 				key={`row-${rowIndex}`}
-				className={`flex w-fit border-b border-gray-100 ${
+				className={`flex w-fit border-b border-gray-100 dark:border-gray-700 ${
 					isSelected
-						? "bg-blue-100"
+						? "bg-blue-100 dark:bg-blue-900/30"
 						: rowIndex % 2 === 0
-							? "bg-white"
-							: "bg-gray-50/60"
+							? "bg-white dark:bg-gray-800"
+							: "bg-gray-50/60 dark:bg-gray-700/60"
 				}`}
 				onClick={() => handleRowSelect(row)}
 				onKeyDown={(e) => {
@@ -599,8 +601,10 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	// Render empty state
 	const renderEmptyState = () => (
 		<div className="flex flex-col items-center justify-center p-4 h-[300px] w-full">
-			<p className="text-lg font-semibold text-gray-500 mb-2">No data found</p>
-			<p className="text-sm text-gray-500">
+			<p className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
+				No data found
+			</p>
+			<p className="text-sm text-gray-500 dark:text-gray-400">
 				{Object.keys(filters).length > 0
 					? "Try adjusting your filters to see more results"
 					: "This table appears to be empty"}
@@ -611,7 +615,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	// Render loading state
 	const renderLoadingState = () => (
 		<div className="flex flex-col items-center justify-center p-4 h-[300px] w-full">
-			<p className="text-lg font-semibold text-gray-500 mb-2">
+			<p className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
 				Loading data...
 			</p>
 		</div>
@@ -619,7 +623,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 	// Render error state
 	const renderErrorState = () => (
-		<div className="flex flex-col items-center justify-center p-4 h-[300px] w-full text-red-500">
+		<div className="flex flex-col items-center justify-center p-4 h-[300px] w-full text-red-500 dark:text-red-400">
 			<p className="text-lg font-semibold mb-2">Error Loading Data</p>
 			<p className="text-sm">{error}</p>
 		</div>
@@ -688,11 +692,13 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		};
 
 		return (
-			<div className="p-4 border-b border-gray-200">
+			<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
 				{/* Pagination Controls */}
 				<div className="flex items-center justify-between mb-3">
 					<div className="flex items-center">
-						<h2 className="text-lg font-semibold text-gray-800">{tableName}</h2>
+						<h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+							{tableName}
+						</h2>
 					</div>
 
 					<div className="flex items-center space-x-6">
@@ -701,12 +707,12 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 							<Button
 								variant="outline"
 								size="sm"
-								className="flex items-center gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+								className="flex items-center gap-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30"
 								onClick={openGlobalFilterModal}
 							>
 								<FiFilter size={14} />
 								<span>Filter</span>
-								<span className="ml-1 text-xs text-gray-500 opacity-75">
+								<span className="ml-1 text-xs text-gray-500 dark:text-gray-400 opacity-75">
 									⌘+F
 								</span>
 							</Button>
@@ -714,13 +720,15 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 						{/* Rows per page selector */}
 						<div className="flex items-center space-x-2">
-							<span className="text-sm text-gray-600">Rows per page:</span>
+							<span className="text-sm text-gray-600 dark:text-gray-300">
+								Rows per page:
+							</span>
 							<select
 								value={pagination.rowsPerPage}
 								onChange={(e) =>
 									handleRowsPerPageChange(Number(e.target.value))
 								}
-								className="border rounded px-2 py-1 text-sm"
+								className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
 								aria-label="Rows per page"
 							>
 								<option value={50}>50</option>
@@ -732,7 +740,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 						{/* Page navigation */}
 						<div className="flex items-center space-x-4">
-							<span className="text-sm text-gray-600">
+							<span className="text-sm text-gray-600 dark:text-gray-300">
 								{pagination.page * pagination.rowsPerPage + 1}-
 								{Math.min(
 									(pagination.page + 1) * pagination.rowsPerPage,
@@ -747,7 +755,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									onClick={() => handlePageChange(pagination.page - 1)}
 									disabled={pagination.page === 0}
 									aria-label="Previous page"
-									className="h-8 w-8"
+									className="h-8 w-8 border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
 								>
 									<FiChevronLeft className="w-5 h-5" />
 								</Button>
@@ -759,7 +767,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 										(pagination.page + 1) * pagination.rowsPerPage >= totalRows
 									}
 									aria-label="Next page"
-									className="h-8 w-8"
+									className="h-8 w-8 border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
 								>
 									<FiChevronRight className="w-5 h-5" />
 								</Button>
@@ -777,15 +785,15 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	};
 
 	return (
-		<div style={{ border: "2px solid red" }}>
+		<div>
 			<div
-				className="flex flex-col overflow-hidden border border-gray-200 rounded-md relative"
+				className="flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 rounded-md relative"
 				style={{ height: "calc(100vh - 50px)" }}
 			>
 				{/* Show loading indicator at the top when loading */}
 				{loading && (
-					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200">
-						<div className="h-full bg-blue-600 animate-progress-indeterminate" />
+					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200 dark:bg-blue-800">
+						<div className="h-full bg-blue-600 dark:bg-blue-500 animate-progress-indeterminate" />
 					</div>
 				)}
 
@@ -795,7 +803,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				{/* Table container with fixed height and horizontal scroll */}
 				<div
 					ref={tableRef}
-					className="relative overflow-auto"
+					className="relative overflow-auto bg-white dark:bg-gray-800"
 					style={{ maxHeight: "calc(100vh - 50px)" }}
 				>
 					{/* Table header (sticky) */}

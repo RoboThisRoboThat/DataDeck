@@ -33,30 +33,46 @@ const Sidebar = ({
 }: SidebarProps) => {
 	return (
 		<div className="flex flex-col h-screen">
-			<div className="p-4 border-b border-gray-200 flex-shrink-0">
-				<h6 className="text-gray-800 mb-3 font-medium">Queries Sidebar</h6>
+			<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
+				<h6 className="text-gray-800 dark:text-gray-200 mb-3 font-medium">
+					Queries Sidebar
+				</h6>
 			</div>
 
-			<div className="flex-1 overflow-y-auto">
+			<div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
 				<div className="p-4 pt-2">
 					<Tabs defaultValue="saved" className="w-full gap-1">
-						<TabsList className="h-12 sticky top-0 bg-white z-10">
-							<TabsTrigger value="saved">
+						<TabsList className="h-12 sticky top-0 bg-white dark:bg-gray-900 z-10">
+							<TabsTrigger
+								value="saved"
+								className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-800"
+							>
 								<div className="flex items-center justify-center gap-1.5">
-									<FiDatabase size={16} />
-									<span>Saved Queries</span>
+									<FiDatabase
+										size={16}
+										className="text-gray-600 dark:text-gray-400"
+									/>
+									<span className="text-gray-700 dark:text-gray-300">
+										Saved Queries
+									</span>
 								</div>
 							</TabsTrigger>
-							<TabsTrigger value="ai">
+							<TabsTrigger
+								value="ai"
+								className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-800"
+							>
 								<div className="flex items-center justify-center gap-1.5">
-									<FiZap size={16} />
-									<span>AI</span>
+									<FiZap
+										size={16}
+										className="text-gray-600 dark:text-gray-400"
+									/>
+									<span className="text-gray-700 dark:text-gray-300">AI</span>
 								</div>
 							</TabsTrigger>
 						</TabsList>
 						<TabsContent
 							value="saved"
-							className="mt-2 border rounded-md shadow-sm"
+							className="mt-2 border border-gray-200 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800"
 						>
 							<SavedQueriesList
 								connectionId={connectionId}
@@ -71,7 +87,7 @@ const Sidebar = ({
 						</TabsContent>
 						<TabsContent
 							value="ai"
-							className="mt-2 border rounded-md shadow-sm"
+							className="mt-2 border border-gray-200 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800"
 						>
 							<AIQueries connectionId={connectionId} />
 						</TabsContent>
