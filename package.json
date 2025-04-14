@@ -10,6 +10,7 @@
     "build:mac": "vite build && electron-builder --config electron-builder.json --mac",
     "build:win": "vite build && electron-builder --config electron-builder.json --win",
     "build:all": "vite build && electron-builder --config electron-builder.json -mwl",
+    "build:app": "node scripts/build-app.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
