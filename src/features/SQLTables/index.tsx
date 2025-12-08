@@ -199,9 +199,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 						<div
 							style={{
 								width: calculateMainContentWidth(),
-								height: "calc(100% - 50px)",
 							}} // Use dynamic width
-							className="flex flex-col overflow-hidden bg-background transition-all duration-300 ease-in-out"
+							className="flex flex-col overflow-hidden bg-background transition-all duration-300 ease-in-out h-full"
 						>
 							{loading && (
 								<div className="p-4 m-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-md dark:bg-blue-900/20 dark:border-blue-800/30 dark:text-blue-400">
@@ -235,16 +234,14 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 							{/* Table Content */}
 							<div
-								className="flex-1 overflow-hidden"
-								style={{ height: "calc(100% - 50px)" }}
+								className="flex-1 overflow-hidden h-full"
 							>
 								{activeTable ? (
 									<div
-										className="flex-1 flex flex-col"
-										style={{ height: "calc(100% - 50px)" }}
+										className="flex-1 flex flex-col h-full"
 									>
 										{/* Data Table */}
-										<div className="overflow-auto">
+										<div className="overflow-auto h-full">
 											<DataTable
 												tableName={activeTable}
 												connectionId={connectionId}
