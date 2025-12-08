@@ -93,10 +93,7 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 
 		return (
 			<div
-				className="w-64 min-w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col"
-				style={{
-					height: "calc(100% - 50px)",
-				}}
+				className="w-64 min-w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full"
 			>
 				<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
 					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">

@@ -171,11 +171,12 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 				<TabsContent
 					value="tables"
 					className="flex mt-0 border-none p-0"
-					style={{ height: "calc(100% - 50px)" }}
+					
 				>
 					<div
-						className="flex flex-1 flex-row h-screen"
+						className="flex flex-row"
 						id="main-tables-container"
+						style={{ height: "calc(100vh - 110px)",  }}
 					>
 						{/* Left Sidebar */}
 						<div
