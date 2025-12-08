@@ -19,6 +19,100 @@ interface ReviewChangesModalProps {
 	loading: boolean;
 }
 
+interface JsonDiffItem {
+	path: string;
+	type: 'added' | 'removed' | 'changed';
+	oldValue?: unknown;
+	newValue?: unknown;
+}
+
+// Compute diff between two JSON values
+function computeJsonDiff(oldVal: unknown, newVal: unknown, path = ''): JsonDiffItem[] {
+	const diffs: JsonDiffItem[] = [];
+
+	// Handle null/undefined cases
+	if (oldVal === newVal) return diffs;
+	if (oldVal === null || oldVal === undefined) {
+		diffs.push({ path: path || 'root', type: 'added', newValue: newVal });
+		return diffs;
+	}
+	if (newVal === null || newVal === undefined) {
+		diffs.push({ path: path || 'root', type: 'removed', oldValue: oldVal });
+		return diffs;
+	}
+
+	// Different types
+	if (typeof oldVal !== typeof newVal) {
+		diffs.push({ path: path || 'root', type: 'changed', oldValue: oldVal, newValue: newVal });
+		return diffs;
+	}
+
+	// Arrays
+	if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+		const maxLen = Math.max(oldVal.length, newVal.length);
+		for (let i = 0; i < maxLen; i++) {
+			const itemPath = path ? `${path}[${i}]` : `[${i}]`;
+			if (i >= oldVal.length) {
+				diffs.push({ path: itemPath, type: 'added', newValue: newVal[i] });
+			} else if (i >= newVal.length) {
+				diffs.push({ path: itemPath, type: 'removed', oldValue: oldVal[i] });
+			} else {
+				diffs.push(...computeJsonDiff(oldVal[i], newVal[i], itemPath));
+			}
+		}
+		return diffs;
+	}
+
+	// Objects
+	if (typeof oldVal === 'object' && typeof newVal === 'object') {
+		const oldObj = oldVal as Record<string, unknown>;
+		const newObj = newVal as Record<string, unknown>;
+		const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+		
+		for (const key of allKeys) {
+			const keyPath = path ? `${path}.${key}` : key;
+			if (!(key in oldObj)) {
+				diffs.push({ path: keyPath, type: 'added', newValue: newObj[key] });
+			} else if (!(key in newObj)) {
+				diffs.push({ path: keyPath, type: 'removed', oldValue: oldObj[key] });
+			} else {
+				diffs.push(...computeJsonDiff(oldObj[key], newObj[key], keyPath));
+			}
+		}
+		return diffs;
+	}
+
+	// Primitives
+	if (oldVal !== newVal) {
+		diffs.push({ path: path || 'root', type: 'changed', oldValue: oldVal, newValue: newVal });
+	}
+
+	return diffs;
+}
+
+// Check if value is a JSON object or array
+function isJsonValue(value: unknown): boolean {
+	return typeof value === 'object' && value !== null;
+}
+
+// Try to parse JSON string
+function tryParseJson(value: unknown): { isJson: boolean; parsed: unknown } {
+	if (typeof value === 'string') {
+		try {
+			const parsed = JSON.parse(value);
+			if (typeof parsed === 'object' && parsed !== null) {
+				return { isJson: true, parsed };
+			}
+		} catch {
+			// Not JSON
+		}
+	}
+	if (isJsonValue(value)) {
+		return { isJson: true, parsed: value };
+	}
+	return { isJson: false, parsed: value };
+}
+
 const ReviewChangesModal = ({
 	open,
 	onClose,
@@ -39,6 +133,14 @@ const ReviewChangesModal = ({
 	const formatValue = (value: unknown): string => {
 		if (value === null) return "NULL";
 		if (value === undefined) return "undefined";
+		if (typeof value === "object") return JSON.stringify(value);
+		return String(value);
+	};
+
+	const formatCompactValue = (value: unknown): string => {
+		if (value === null) return "null";
+		if (value === undefined) return "undefined";
+		if (typeof value === "string") return `"${value}"`;
 		if (typeof value === "object") return JSON.stringify(value);
 		return String(value);
 	};
@@ -95,47 +197,167 @@ const ReviewChangesModal = ({
 
 									{/* Changes - diff style */}
 									<div className="font-mono text-sm">
-										{Object.entries(rowChanges).map(([col, change]) => (
-											<div key={col} className="group/change relative">
-												{/* Column name */}
-												<div className="bg-[#2d2d2d] px-4 py-1 text-[#569cd6] text-xs border-b border-[#3c3c3c]">
-													{col}
-												</div>
-												
-												{/* Deletion line (red) */}
-												<div className="flex items-stretch bg-[#4b1818] border-l-4 border-[#f14c4c]">
-													<div className="w-8 flex-shrink-0 flex items-center justify-center text-[#f14c4c] bg-[#3d1515]">
-														<FiMinus size={12} />
-													</div>
-													<div className="flex-1 px-3 py-1.5 text-[#f14c4c] overflow-hidden">
-														<span className="line-through opacity-80">
-															{formatValue(change.originalValue)}
-														</span>
-													</div>
-												</div>
-												
-												{/* Addition line (green) */}
-												<div className="flex items-stretch bg-[#1b4721] border-l-4 border-[#23d18b]">
-													<div className="w-8 flex-shrink-0 flex items-center justify-center text-[#23d18b] bg-[#143d1a]">
-														<FiPlus size={12} />
-													</div>
-													<div className="flex-1 px-3 py-1.5 text-[#23d18b] overflow-hidden">
-														{formatValue(change.value)}
-													</div>
-												</div>
+										{Object.entries(rowChanges).map(([col, change]) => {
+											const oldParsed = tryParseJson(change.originalValue);
+											const newParsed = tryParseJson(change.value);
+											const bothJson = oldParsed.isJson && newParsed.isJson;
+											
+											// Compute JSON diff if both values are JSON
+											const jsonDiffs = bothJson 
+												? computeJsonDiff(oldParsed.parsed, newParsed.parsed)
+												: [];
 
-												{/* Discard single change button */}
-												<Button
-													variant="ghost"
-													size="icon"
-													className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded text-[#858585] opacity-0 group-hover/change:opacity-100 hover:bg-[#5a1d1d] hover:text-[#f48771] transition-all"
-													onClick={() => onDiscard(rowKey, col)}
-													title="Discard this change"
-												>
-													<FiX size={14} />
-												</Button>
-											</div>
-										))}
+											// Helper to format path for display
+											const formatPath = (path: string) => {
+												const parts = path.split(/\.|\[/).map(p => p.replace(']', ''));
+												return parts;
+											};
+
+											// Helper to get change type label
+											const getChangeTypeLabel = (type: 'added' | 'removed' | 'changed') => {
+												switch (type) {
+													case 'added': return 'Added';
+													case 'removed': return 'Removed';
+													case 'changed': return 'Modified';
+												}
+											};
+
+											return (
+												<div key={col} className="group/change relative">
+													{/* Column name */}
+													<div className="bg-[#2d2d2d] px-4 py-1.5 text-[#569cd6] text-xs border-b border-[#3c3c3c] flex items-center justify-between">
+														<span className="font-medium">{col}</span>
+														{bothJson && jsonDiffs.length > 0 && (
+															<span className="text-[#858585]">
+																{jsonDiffs.length} {jsonDiffs.length === 1 ? 'property' : 'properties'} changed
+															</span>
+														)}
+													</div>
+													
+													{bothJson && jsonDiffs.length > 0 ? (
+														// JSON diff view - show only changed properties with full context
+														<div className="divide-y divide-[#3c3c3c]/50">
+															{jsonDiffs.map((diff, idx) => {
+																const pathParts = formatPath(diff.path);
+																const propertyName = pathParts[pathParts.length - 1];
+																const parentPath = pathParts.slice(0, -1);
+																
+																return (
+																	<div key={idx} className="text-xs">
+																		{/* Path header with full context */}
+																		<div className="bg-[#252526] px-4 py-2 border-b border-[#3c3c3c]/50">
+																			{/* Change type badge */}
+																			<div className="flex items-center gap-2 mb-1.5">
+																				<span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+																					diff.type === 'added' 
+																						? 'bg-[#1b4721] text-[#23d18b]' 
+																						: diff.type === 'removed'
+																							? 'bg-[#4b1818] text-[#f14c4c]'
+																							: 'bg-[#0e639c] text-white'
+																				}`}>
+																					{getChangeTypeLabel(diff.type)}
+																				</span>
+																				<span className="text-[#858585]">in</span>
+																				<span className="text-[#ce9178]">{col}</span>
+																			</div>
+																			
+																			{/* Breadcrumb path */}
+																			<div className="flex items-center flex-wrap gap-1 text-[11px]">
+																				<span className="text-[#858585]">Path:</span>
+																				{parentPath.length > 0 && (
+																					<>
+																						{parentPath.map((part, i) => (
+																							<span key={i} className="flex items-center">
+																								<span className={`${
+																									part.match(/^\d+$/) 
+																										? 'text-[#b5cea8]' // number (array index)
+																										: 'text-[#9cdcfe]' // property name
+																								}`}>
+																									{part.match(/^\d+$/) ? `[${part}]` : part}
+																								</span>
+																								<span className="text-[#858585] mx-1">→</span>
+																							</span>
+																						))}
+																					</>
+																				)}
+																				<span className={`font-medium ${
+																					propertyName.match(/^\d+$/) 
+																						? 'text-[#b5cea8]' 
+																						: 'text-[#4fc1ff]'
+																				}`}>
+																					{propertyName.match(/^\d+$/) ? `[${propertyName}]` : propertyName}
+																				</span>
+																			</div>
+																		</div>
+																		
+																		{/* Values */}
+																		{(diff.type === 'removed' || diff.type === 'changed') && (
+																			<div className="flex items-stretch bg-[#4b1818] border-l-4 border-[#f14c4c]">
+																				<div className="w-10 flex-shrink-0 flex items-center justify-center text-[#f14c4c] bg-[#3d1515] text-[10px] font-medium">
+																					OLD
+																				</div>
+																				<div className="flex-1 px-3 py-1.5 text-[#f14c4c] overflow-hidden break-all">
+																					<span className="line-through opacity-80">
+																						{formatCompactValue(diff.oldValue)}
+																					</span>
+																				</div>
+																			</div>
+																		)}
+																		
+																		{(diff.type === 'added' || diff.type === 'changed') && (
+																			<div className="flex items-stretch bg-[#1b4721] border-l-4 border-[#23d18b]">
+																				<div className="w-10 flex-shrink-0 flex items-center justify-center text-[#23d18b] bg-[#143d1a] text-[10px] font-medium">
+																					NEW
+																				</div>
+																				<div className="flex-1 px-3 py-1.5 text-[#23d18b] overflow-hidden break-all">
+																					{formatCompactValue(diff.newValue)}
+																				</div>
+																			</div>
+																		)}
+																	</div>
+																);
+															})}
+														</div>
+													) : (
+														// Regular diff view for non-JSON values
+														<>
+															{/* Deletion line (red) */}
+															<div className="flex items-stretch bg-[#4b1818] border-l-4 border-[#f14c4c]">
+																<div className="w-8 flex-shrink-0 flex items-center justify-center text-[#f14c4c] bg-[#3d1515]">
+																	<FiMinus size={12} />
+																</div>
+																<div className="flex-1 px-3 py-1.5 text-[#f14c4c] overflow-hidden break-all">
+																	<span className="line-through opacity-80">
+																		{formatValue(change.originalValue)}
+																	</span>
+																</div>
+															</div>
+															
+															{/* Addition line (green) */}
+															<div className="flex items-stretch bg-[#1b4721] border-l-4 border-[#23d18b]">
+																<div className="w-8 flex-shrink-0 flex items-center justify-center text-[#23d18b] bg-[#143d1a]">
+																	<FiPlus size={12} />
+																</div>
+																<div className="flex-1 px-3 py-1.5 text-[#23d18b] overflow-hidden break-all">
+																	{formatValue(change.value)}
+																</div>
+															</div>
+														</>
+													)}
+
+													{/* Discard single change button */}
+													<Button
+														variant="ghost"
+														size="icon"
+														className="absolute right-2 top-6 h-6 w-6 rounded text-[#858585] opacity-0 group-hover/change:opacity-100 hover:bg-[#5a1d1d] hover:text-[#f48771] transition-all"
+														onClick={() => onDiscard(rowKey, col)}
+														title="Discard this change"
+													>
+														<FiX size={14} />
+													</Button>
+												</div>
+											);
+										})}
 									</div>
 								</div>
 							);
