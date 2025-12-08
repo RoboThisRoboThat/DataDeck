@@ -33440,21 +33440,27 @@ let CloseStatement$2 = class CloseStatement {
 };
 var close_statement$1 = CloseStatement$2;
 var field_flags = {};
-field_flags.NOT_NULL = 1;
-field_flags.PRI_KEY = 2;
-field_flags.UNIQUE_KEY = 4;
-field_flags.MULTIPLE_KEY = 8;
-field_flags.BLOB = 16;
-field_flags.UNSIGNED = 32;
-field_flags.ZEROFILL = 64;
-field_flags.BINARY = 128;
-field_flags.ENUM = 256;
-field_flags.AUTO_INCREMENT = 512;
-field_flags.TIMESTAMP = 1024;
-field_flags.SET = 2048;
-field_flags.NO_DEFAULT_VALUE = 4096;
-field_flags.ON_UPDATE_NOW = 8192;
-field_flags.NUM = 32768;
+var hasRequiredField_flags;
+function requireField_flags() {
+  if (hasRequiredField_flags) return field_flags;
+  hasRequiredField_flags = 1;
+  field_flags.NOT_NULL = 1;
+  field_flags.PRI_KEY = 2;
+  field_flags.UNIQUE_KEY = 4;
+  field_flags.MULTIPLE_KEY = 8;
+  field_flags.BLOB = 16;
+  field_flags.UNSIGNED = 32;
+  field_flags.ZEROFILL = 64;
+  field_flags.BINARY = 128;
+  field_flags.ENUM = 256;
+  field_flags.AUTO_INCREMENT = 512;
+  field_flags.TIMESTAMP = 1024;
+  field_flags.SET = 2048;
+  field_flags.NO_DEFAULT_VALUE = 4096;
+  field_flags.ON_UPDATE_NOW = 8192;
+  field_flags.NUM = 32768;
+  return field_flags;
+}
 const Packet$b = packet;
 const StringParser$2 = string;
 const CharsetToEncoding$7 = requireCharset_encodings();
@@ -33518,7 +33524,7 @@ class ColumnDefinition {
     for (const t2 in Types2) {
       typeNames2[Types2[t2]] = t2;
     }
-    const fiedFlags = field_flags;
+    const fiedFlags = requireField_flags();
     const flagNames2 = [];
     const inspectFlags = this.flags;
     for (const f in fiedFlags) {
@@ -36412,7 +36418,7 @@ let CloseStatement$1 = class CloseStatement2 extends Command$9 {
   }
 };
 var close_statement = CloseStatement$1;
-const FieldFlags = field_flags;
+const FieldFlags = requireField_flags();
 const Charsets$1 = requireCharsets();
 const Types = requireTypes();
 const helpers = helpers$2;
@@ -40654,7 +40660,9 @@ class MySQLService {
         port: Number.parseInt(config2.port),
         user: config2.user,
         password: config2.password,
-        database: config2.database
+        database: config2.database,
+        // Return date/time columns as raw strings (no JS Date conversion)
+        dateStrings: true
       });
       await this.connection.connect();
       return { success: true, message: "Connected successfully" };
@@ -42962,7 +42970,16 @@ class PostgresService {
         port: Number.parseInt(config2.port),
         user: config2.user,
         password: config2.password,
-        database: config2.database
+        database: config2.database,
+        // Return date/time columns as raw strings (no JS Date conversion)
+        types: {
+          1082: { parse: (value) => value },
+          // DATE
+          1114: { parse: (value) => value },
+          // TIMESTAMP WITHOUT TZ
+          1184: { parse: (value) => value }
+          // TIMESTAMP WITH TZ
+        }
       });
       await this.connection`SELECT 1`;
       return { success: true, message: "Connected successfully" };

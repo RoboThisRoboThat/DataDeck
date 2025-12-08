@@ -17,6 +17,8 @@ class MySQLService {
 				user: config.user,
 				password: config.password,
 				database: config.database,
+				// Return date/time columns as raw strings (no JS Date conversion)
+				dateStrings: true,
 			});
 
 			// Test the connection

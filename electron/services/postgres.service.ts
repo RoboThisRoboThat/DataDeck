@@ -18,6 +18,12 @@ class PostgresService {
 				user: config.user,
 				password: config.password,
 				database: config.database,
+				// Return date/time columns as raw strings (no JS Date conversion)
+				types: {
+					1082: { parse: (value: string) => value }, // DATE
+					1114: { parse: (value: string) => value }, // TIMESTAMP WITHOUT TZ
+					1184: { parse: (value: string) => value }, // TIMESTAMP WITH TZ
+				},
 			});
 
 			// Test the connection with a simple query
