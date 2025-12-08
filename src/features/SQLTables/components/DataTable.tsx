@@ -8,13 +8,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
 	FiFilter,
 	FiArrowUp,
 	FiArrowDown,
@@ -30,7 +23,6 @@ import ReviewChangesModal from "./ReviewChangesModal";
 import { getRowKey } from "../utils/rowKey";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { useError } from "../../../context/ErrorContext";
-import dayjs from "dayjs";
 import {
 	fetchTableData,
 	setFilters,
@@ -288,17 +280,41 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		setFilterModalOpen(false);
 	};
 
-	// Handle sort change
-	const handleSortChange = (
-		column: string,
-		direction: "asc" | "desc" | null,
-	) => {
-		dispatch(
-			setSortConfig({
-				tableName,
-				sortConfig: { column, direction },
-			}),
-		);
+	// Handle column header click for sorting - cycles through: none -> asc -> desc -> none
+	const handleColumnHeaderClick = (column: string) => {
+		if (sortConfig.column !== column) {
+			// Different column, start with ascending
+			dispatch(
+				setSortConfig({
+					tableName,
+					sortConfig: { column, direction: "asc" },
+				}),
+			);
+		} else if (sortConfig.direction === "asc") {
+			// Same column, ascending -> descending
+			dispatch(
+				setSortConfig({
+					tableName,
+					sortConfig: { column, direction: "desc" },
+				}),
+			);
+		} else if (sortConfig.direction === "desc") {
+			// Same column, descending -> no sort
+			dispatch(
+				setSortConfig({
+					tableName,
+					sortConfig: { column: "", direction: null },
+				}),
+			);
+		} else {
+			// No sort -> ascending
+			dispatch(
+				setSortConfig({
+					tableName,
+					sortConfig: { column, direction: "asc" },
+				}),
+			);
+		}
 	};
 
 	// Handle remove sort
@@ -344,12 +360,6 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		);
 	};
 
-	// Handle filter click from column menu
-	const handleFilterClick = (column: string) => {
-		setFilterColumn(column);
-		setFilterModalOpen(true);
-	};
-
 	// Copy cell content to clipboard - memoized to prevent unnecessary re-renders
 	const handleCopyCellContent = useCallback((value: unknown) => {
 		const textToCopy = formatCellValue(value);
@@ -364,68 +374,88 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			});
 	}, []);
 
-	// Format cell value for display
+	// Format Date to YYYY-MM-DD HH:mm:ss (database-like format)
+	const formatDateToDbFormat = (date: Date): string => {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hours = String(date.getHours()).padStart(2, '0');
+		const minutes = String(date.getMinutes()).padStart(2, '0');
+		const seconds = String(date.getSeconds()).padStart(2, '0');
+		return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+	};
+
+	// Format cell value for display - show raw values without date formatting
 	const formatCellValue = (value: unknown): string => {
 		if (value === null || value === undefined) {
 			return "";
 		}
 
+		// Handle Date objects - format as YYYY-MM-DD HH:mm:ss
 		if (value instanceof Date) {
-			return dayjs(value).format("YYYY-MM-DD HH:mm:ss");
+			return formatDateToDbFormat(value);
 		}
+
 		if (typeof value === "object") {
 			return JSON.stringify(value);
 		}
 
-		// Handle other types
+		// Return as-is without date formatting
 		return String(value);
 	};
 
 	// Determine if we have data to show
 	const hasData = data.length > 0 && columns.length > 0;
 
-	// State for column resizing
+	// State for column widths (persisted)
 	const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
-	const [resizingColumn, setResizingColumn] = useState<string | null>(null);
-	const [startX, setStartX] = useState(0);
-	const [startWidth, setStartWidth] = useState(0);
+	
+	// Use refs for resize state to avoid stale closures in event handlers
+	const resizeRef = useRef<{
+		column: string | null;
+		startX: number;
+		startWidth: number;
+	}>({ column: null, startX: 0, startWidth: 0 });
+
+	// Handle column resize movement - defined as ref to avoid recreation
+	const handleResizeMove = useRef((e: MouseEvent) => {
+		const { column, startX, startWidth } = resizeRef.current;
+		if (!column) return;
+
+		const diff = e.clientX - startX;
+		const newWidth = Math.max(100, startWidth + diff); // Minimum width of 100px
+
+		setColumnWidths((prev) => ({
+			...prev,
+			[column]: newWidth,
+		}));
+	}).current;
+
+	// Handle column resize end - defined as ref to avoid recreation
+	const handleResizeEnd = useRef(() => {
+		resizeRef.current.column = null;
+
+		// Remove event listeners
+		document.removeEventListener("mousemove", handleResizeMove);
+		document.removeEventListener("mouseup", handleResizeEnd.current);
+	}).current;
 
 	// Handle column resize start
 	const handleResizeStart = (e: React.MouseEvent, column: string) => {
 		e.preventDefault();
-		setResizingColumn(column);
-		setStartX(e.clientX);
-		setStartWidth(columnWidths[column] || getDefaultColumnWidth(column));
+		e.stopPropagation(); // Prevent triggering sort
+		
+		// Store resize state in ref
+		resizeRef.current = {
+			column,
+			startX: e.clientX,
+			startWidth: columnWidths[column] || getDefaultColumnWidth(column),
+		};
 
 		// Add event listeners to track mouse movement and release
 		document.addEventListener("mousemove", handleResizeMove);
 		document.addEventListener("mouseup", handleResizeEnd);
 	};
-
-	// Handle column resize movement
-	const handleResizeMove = useCallback(
-		(e: globalThis.MouseEvent) => {
-			if (!resizingColumn) return;
-
-			const diff = e.clientX - startX;
-			const newWidth = Math.max(100, startWidth + diff); // Minimum width of 100px
-
-			setColumnWidths((prev) => ({
-				...prev,
-				[resizingColumn]: newWidth,
-			}));
-		},
-		[resizingColumn, startX, startWidth],
-	);
-
-	// Handle column resize end
-	const handleResizeEnd = useCallback(() => {
-		setResizingColumn(null);
-
-		// Remove event listeners
-		document.removeEventListener("mousemove", handleResizeMove);
-		document.removeEventListener("mouseup", handleResizeEnd);
-	}, [handleResizeMove]);
 
 	// Clean up event listeners on unmount
 	useEffect(() => {
@@ -466,7 +496,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		[dispatch, tableName],
 	);
 
-	// Render the table header
+	// Render the table header with click-to-sort
 	const renderTableHeader = () => (
 		<div className="sticky top-0 z-10 flex border-b border-border/60 bg-card/80 shadow-sm w-fit backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
 			{columns.map((column) => {
@@ -477,7 +507,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				return (
 					<div
 						key={`header-${column}`}
-						className={`flex items-center justify-between px-3 py-3 font-medium relative ${
+						className={`flex items-center justify-between px-3 py-3 font-medium relative cursor-pointer select-none hover:bg-muted/50 transition-colors ${
 							isPrimaryKey
 								? "bg-primary/5 text-primary"
 								: "text-foreground"
@@ -488,11 +518,27 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 							maxWidth: width,
 							borderRight: "1px solid var(--border)",
 						}}
+						onClick={() => handleColumnHeaderClick(column)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								handleColumnHeaderClick(column);
+							}
+						}}
+						role="columnheader"
+						tabIndex={0}
+						aria-sort={
+							isColumnSorted
+								? sortConfig.direction === "asc"
+									? "ascending"
+									: "descending"
+								: "none"
+						}
 					>
 						<TooltipProvider>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<span className="max-w-[200px] truncate font-medium">
+									<span className="max-w-[200px] truncate font-medium flex items-center gap-1">
 										{column}
 										{isPrimaryKey && (
 											<span className="ml-1 text-[11px] bg-primary/15 text-primary px-1 py-0.5 rounded">
@@ -502,75 +548,36 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									</span>
 								</TooltipTrigger>
 								<TooltipContent>
-									<p>{column}</p>
+									<p>{column} - Click to sort</p>
 								</TooltipContent>
 							</Tooltip>
 						</TooltipProvider>
 
 						{/* Sort indicator */}
-						{isColumnSorted && (
-							<div className="mx-1 text-primary">
-								{sortConfig.direction === "asc" ? (
-									<FiArrowUp size={14} />
-								) : (
-									<FiArrowDown size={14} />
-								)}
-							</div>
-						)}
-
-						{/* Filter icon for each column */}
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<div
-									className="relative"
-									onClick={(e) => e.stopPropagation()}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											e.stopPropagation();
-										}
-									}}
-								>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8 p-0 ml-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-sm"
-									>
-										<FiFilter size={14} />
-									</Button>
+						<div className="flex items-center ml-1">
+							{isColumnSorted ? (
+								<div className="text-primary">
+									{sortConfig.direction === "asc" ? (
+										<FiArrowUp size={14} />
+									) : (
+										<FiArrowDown size={14} />
+									)}
 								</div>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								align="end"
-								className="z-[100]"
-								side="bottom"
-								sideOffset={5}
-								onClick={(e) => e.stopPropagation()}
-								onKeyDown={(e) => e.stopPropagation()}
-							>
-								<DropdownMenuItem
-									onClick={() => handleSortChange(column, "asc")}
-								>
-									<FiArrowUp className="mr-2 h-4 w-4" />
-									<span>Sort Ascending</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem
-									onClick={() => handleSortChange(column, "desc")}
-								>
-									<FiArrowDown className="mr-2 h-4 w-4" />
-									<span>Sort Descending</span>
-								</DropdownMenuItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem onClick={() => handleFilterClick(column)}>
-									<FiFilter className="mr-2 h-4 w-4" />
-									<span>Filter</span>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
+							) : (
+								<div className="text-muted-foreground/40 opacity-0 group-hover:opacity-100">
+									<FiArrowUp size={14} />
+								</div>
+							)}
+						</div>
 
 						{/* Column resize handle */}
 						<div
 							className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-blue-300/50 active:bg-blue-400/50 z-20"
 							onMouseDown={(e) => handleResizeStart(e, column)}
+							onClick={(e) => e.stopPropagation()}
+							onKeyDown={(e) => e.stopPropagation()}
+							role="separator"
+							aria-orientation="vertical"
 						/>
 					</div>
 				);
@@ -814,7 +821,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				{/* Table container with fixed height and horizontal scroll */}
 				<div
 					ref={tableRef}
-					className="relative overflow-auto bg-card"
+					className="relative overflow-auto bg-card flex-1"
 					style={{ maxHeight: "calc(100vh - 50px)" }}
 				>
 					{/* Table header (sticky) */}
@@ -875,6 +882,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				onSave={handleSaveAllChanges}
 				onDiscard={handleDiscardChange}
 				loading={saveLoading}
+				tableName={tableName}
 			/>
 		</div>
 	);

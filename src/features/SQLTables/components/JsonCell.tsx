@@ -5,11 +5,23 @@ interface JsonCellProps {
   value: unknown;
 }
 
+// Format Date to YYYY-MM-DD HH:mm:ss (database-like format)
+const formatDateToDbFormat = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 const JsonCell = ({ value }: JsonCellProps) => {
   const [expanded, setExpanded] = useState(false);
   
-  if (!value || typeof value !== 'object') {
-    return <span>{String(value)}</span>;
+  // Handle non-objects or Date objects (Date should be displayed as string, not JSON)
+  if (!value || typeof value !== 'object' || value instanceof Date) {
+    return <span>{value instanceof Date ? formatDateToDbFormat(value) : String(value)}</span>;
   }
   
   const formattedJson = JSON.stringify(value, null, 2);
