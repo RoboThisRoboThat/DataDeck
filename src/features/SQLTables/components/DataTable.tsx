@@ -394,7 +394,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 	// Render the table header
 	const renderTableHeader = () => (
-		<div className="sticky top-0 z-10 flex border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 shadow-sm w-fit">
+		<div className="sticky top-0 z-10 flex border-b border-border/60 bg-card/80 shadow-sm w-fit backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
 			{columns.map((column) => {
 				const width = getCellWidth(column);
 				const isPrimaryKey = primaryKeys.includes(column);
@@ -405,14 +405,14 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						key={`header-${column}`}
 						className={`flex items-center justify-between px-3 py-3 font-medium relative ${
 							isPrimaryKey
-								? "bg-blue-50/70 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
-								: "text-gray-700 dark:text-gray-300"
-						} ${isColumnSorted ? "bg-purple-50/80 dark:bg-purple-900/30" : ""}`}
+								? "bg-primary/5 text-primary"
+								: "text-foreground"
+						} ${isColumnSorted ? "bg-primary/10" : ""}`}
 						style={{
 							width,
 							minWidth: width,
 							maxWidth: width,
-							borderRight: "1px solid rgba(224, 224, 224, 0.6)",
+							borderRight: "1px solid var(--border)",
 						}}
 					>
 						<TooltipProvider>
@@ -421,7 +421,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									<span className="max-w-[200px] truncate font-medium">
 										{column}
 										{isPrimaryKey && (
-											<span className="ml-1 text-xs bg-blue-200 text-blue-800 px-1 py-0.5 rounded">
+											<span className="ml-1 text-[11px] bg-primary/15 text-primary px-1 py-0.5 rounded">
 												PK
 											</span>
 										)}
@@ -435,7 +435,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 						{/* Sort indicator */}
 						{isColumnSorted && (
-							<div className="mx-1 text-purple-700">
+							<div className="mx-1 text-primary">
 								{sortConfig.direction === "asc" ? (
 									<FiArrowUp size={14} />
 								) : (
@@ -459,7 +459,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-8 w-8 p-0 ml-1 text-gray-500 hover:text-gray-800 hover:bg-gray-200/60 rounded-sm"
+										className="h-8 w-8 p-0 ml-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-sm"
 									>
 										<FiFilter size={14} />
 									</Button>
@@ -515,12 +515,12 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		return (
 			<div
 				key={`row-${rowIndex}`}
-				className={`flex w-fit border-b border-gray-100 dark:border-gray-700 ${
+				className={`flex w-fit border-b border-border/60 transition-colors ${
 					isSelected
-						? "bg-blue-100 dark:bg-blue-900/30"
+						? "bg-primary/10 ring-1 ring-primary/30"
 						: rowIndex % 2 === 0
-							? "bg-white dark:bg-gray-800"
-							: "bg-gray-50/60 dark:bg-gray-700/60"
+							? "bg-card"
+							: "bg-muted/60"
 				}`}
 				onClick={() => handleRowSelect(row)}
 				onKeyDown={(e) => {
@@ -553,7 +553,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 								width,
 								minWidth: width,
 								maxWidth: width,
-								borderRight: "1px solid rgba(224, 224, 224, 0.4)",
+								borderRight: "1px solid var(--border)",
 							}}
 						>
 							<div
@@ -569,7 +569,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 													variant="ghost"
 													className={`p-0 h-auto w-full justify-start font-normal truncate text-left hover:bg-transparent ${
 														isNull
-															? "text-gray-400 italic"
+															? "text-muted-foreground italic"
 															: isPrimaryKey
 																? "font-medium"
 																: ""
@@ -646,7 +646,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			const activeFilters = Object.entries(filters).map(([column, filter]) => (
 				<div
 					key={`filter-${column}`}
-					className="flex items-center text-sm rounded-full mr-2 mb-2 border border-blue-200 bg-blue-50 text-blue-700 px-3 py-1 gap-1"
+					className="flex items-center text-sm rounded-full mr-2 mb-2 border border-primary/30 bg-primary/10 text-primary px-3 py-1 gap-1"
 				>
 					<span className="font-medium mr-1">{column}</span>
 					<span className="mr-2">
@@ -666,7 +666,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			const sortChip = sortConfig.column && sortConfig.direction && (
 				<div
 					key="sort-chip"
-					className="flex items-center text-sm rounded-full mr-2 mb-2 border border-purple-200 bg-purple-50 text-purple-700 px-3 py-1 gap-1"
+					className="flex items-center text-sm rounded-full mr-2 mb-2 border border-primary/30 bg-primary/10 text-primary px-3 py-1 gap-1"
 				>
 					<span className="font-medium mr-1">{sortConfig.column}</span>
 					<span className="mr-2 flex items-center">
@@ -692,11 +692,11 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		};
 
 		return (
-			<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+			<div className="p-4 border-b border-border/60 bg-card">
 				{/* Pagination Controls */}
 				<div className="flex items-center justify-between mb-3">
 					<div className="flex items-center">
-						<h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+						<h2 className="text-lg font-semibold text-foreground">
 							{tableName}
 						</h2>
 					</div>
@@ -707,12 +707,12 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 							<Button
 								variant="outline"
 								size="sm"
-								className="flex items-center gap-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+								className="flex items-center gap-1 text-primary border border-primary/30 hover:bg-primary/10"
 								onClick={openGlobalFilterModal}
 							>
 								<FiFilter size={14} />
 								<span>Filter</span>
-								<span className="ml-1 text-xs text-gray-500 dark:text-gray-400 opacity-75">
+								<span className="ml-1 text-xs text-muted-foreground opacity-75">
 									⌘+F
 								</span>
 							</Button>
@@ -720,7 +720,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 						{/* Rows per page selector */}
 						<div className="flex items-center space-x-2">
-							<span className="text-sm text-gray-600 dark:text-gray-300">
+							<span className="text-sm text-muted-foreground">
 								Rows per page:
 							</span>
 							<select
@@ -728,7 +728,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 								onChange={(e) =>
 									handleRowsPerPageChange(Number(e.target.value))
 								}
-								className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+								className="border rounded px-2 py-1 text-sm bg-card text-foreground border-border focus:outline-none focus:ring-2 focus:ring-primary/60"
 								aria-label="Rows per page"
 							>
 								<option value={50}>50</option>
@@ -740,7 +740,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 						{/* Page navigation */}
 						<div className="flex items-center space-x-4">
-							<span className="text-sm text-gray-600 dark:text-gray-300">
+							<span className="text-sm text-muted-foreground">
 								{pagination.page * pagination.rowsPerPage + 1}-
 								{Math.min(
 									(pagination.page + 1) * pagination.rowsPerPage,
@@ -755,7 +755,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 									onClick={() => handlePageChange(pagination.page - 1)}
 									disabled={pagination.page === 0}
 									aria-label="Previous page"
-									className="h-8 w-8 border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+									className="h-8 w-8 border-border text-foreground hover:bg-muted"
 								>
 									<FiChevronLeft className="w-5 h-5" />
 								</Button>
@@ -767,7 +767,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 										(pagination.page + 1) * pagination.rowsPerPage >= totalRows
 									}
 									aria-label="Next page"
-									className="h-8 w-8 border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+									className="h-8 w-8 border-border text-foreground hover:bg-muted"
 								>
 									<FiChevronRight className="w-5 h-5" />
 								</Button>
@@ -787,13 +787,13 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	return (
 		<div>
 			<div
-				className="flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 rounded-md relative"
+				className="flex flex-col overflow-hidden border border-border/60 rounded-lg relative bg-panel shadow-sm"
 				style={{ height: "calc(100vh - 50px)" }}
 			>
 				{/* Show loading indicator at the top when loading */}
 				{loading && (
-					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-blue-200 dark:bg-blue-800">
-						<div className="h-full bg-blue-600 dark:bg-blue-500 animate-progress-indeterminate" />
+					<div className="absolute top-0 left-0 right-0 z-10 h-1 bg-primary/15">
+						<div className="h-full bg-primary animate-progress-indeterminate" />
 					</div>
 				)}
 
@@ -803,7 +803,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				{/* Table container with fixed height and horizontal scroll */}
 				<div
 					ref={tableRef}
-					className="relative overflow-auto bg-white dark:bg-gray-800"
+					className="relative overflow-auto bg-card"
 					style={{ maxHeight: "calc(100vh - 50px)" }}
 				>
 					{/* Table header (sticky) */}

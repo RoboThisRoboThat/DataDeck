@@ -92,11 +92,11 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 		};
 
 		return (
-			<div
-				className="w-64 min-w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full"
-			>
-				<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-4">
+      <div
+        className="w-64 min-w-64 bg-panel border-r border-border/60 flex flex-col h-full"
+      >
+        <div className="p-4 border-b border-border/60 bg-panel">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.18em] mb-3">
 						Tables
 					</h2>
 
@@ -110,9 +110,7 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 								onChange={(e) => setTableSearch(e.target.value)}
 								onKeyDown={handleInputKeyDown}
 								placeholder="Search tables..."
-								className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm placeholder:text-muted-foreground/70 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-transparent shadow-sm"
 							/>
 						</div>
 					</div>
@@ -125,11 +123,11 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 							<button
 								key={table}
 								type="button"
-								className={`w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors
-                ${openTables.includes(table) ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"}
-                ${activeTable === table ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-700"}
-                ${index === focusedIndex ? "ring-2 ring-blue-500 ring-offset-1 bg-blue-50 dark:bg-blue-900/20" : ""}
-                focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors
+                ${openTables.includes(table) ? "text-primary" : "text-foreground"}
+                ${activeTable === table ? "bg-primary/10 text-primary border border-primary/30 shadow-sm" : "hover:bg-muted"}
+                ${index === focusedIndex ? "ring-2 ring-primary/70 ring-offset-1 ring-offset-background" : ""}
+                focus:outline-none focus:ring-2 focus:ring-primary/70`}
 								onClick={() => handleTableSelect(table)}
 							>
 								{table}
@@ -137,11 +135,11 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 						))}
 
 						{/* No Results Message */}
-						{filteredTables.length === 0 && (
-							<div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-								No tables found matching "{tableSearch}"
-							</div>
-						)}
+            {filteredTables.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                No tables found matching "{tableSearch}"
+              </div>
+            )}
 					</div>
 				</div>
 			</div>

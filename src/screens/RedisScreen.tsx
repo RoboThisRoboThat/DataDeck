@@ -1528,7 +1528,7 @@ export function RedisScreen() {
 						onValueChange={setActiveTab}
 						className="flex-1 flex flex-col"
 					>
-						<div className="flex justify-between items-center px-4 py-2 border-b">
+						<div className="flex justify-between items-center px-4 py-2 border-b border-border/60 bg-card/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
 							<TabsList>
 								<TabsTrigger value="browser">
 									<Database className="h-4 w-4 mr-2" />
@@ -1571,8 +1571,8 @@ export function RedisScreen() {
 						<TabsContent value="browser" className="flex-1 flex flex-col p-0">
 							<div className="flex-1 flex overflow-hidden">
 								{/* Keys list */}
-								<div className="w-1/3 flex flex-col border-r">
-									<div className="p-4 border-b">
+								<div className="w-1/3 flex flex-col border-r border-border/60 bg-panel">
+									<div className="p-4 border-b border-border/60">
 										<div className="flex gap-2">
 											<div className="flex-1 relative">
 												<Input
@@ -1619,11 +1619,11 @@ export function RedisScreen() {
 												<p className="text-muted-foreground">No keys found</p>
 											</div>
 										) : (
-											<div className="divide-y">
+											<div className="divide-y divide-border/60">
 												{keys.map((key) => (
 													<div
 														key={key}
-														className={`group flex justify-between items-center px-4 py-2 hover:bg-muted cursor-pointer ${selectedKey === key ? "bg-muted" : ""}`}
+														className={`group flex justify-between items-center px-4 py-2 hover:bg-muted cursor-pointer ${selectedKey === key ? "bg-primary/10" : ""}`}
 													>
 														{keyBeingRenamed === key ? (
 															<form

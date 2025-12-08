@@ -260,13 +260,18 @@ export function ConnectionScreen() {
 
 	const renderConnectionsTab = () => (
 		<>
-			<div className="flex justify-between items-center mb-4">
-				<h2 className="text-lg font-medium">Database Connections</h2>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Connections
+          </p>
+          <h2 className="text-xl font-semibold">Database Connections</h2>
+        </div>
 				<Button
 					variant="default"
 					size="sm"
 					onClick={() => setIsModalOpen(true)}
-					className={"flex items-center gap-1.5"}
+          className={"flex items-center gap-1.5 shadow-sm"}
 				>
 					<Plus className="size-4" />
 					Add Connection
@@ -285,11 +290,11 @@ export function ConnectionScreen() {
 				</div>
 			)}
 
-			<div className="bg-card rounded-lg shadow-sm border border-border">
+      <div className="bg-card/90 rounded-lg shadow-sm border border-border/70 overflow-hidden">
 				{connections.map((connection) => (
 					<div
 						key={connection.id}
-						className="border-b border-border last:border-b-0 cursor-pointer"
+            className="border-b border-border/60 last:border-b-0 cursor-pointer"
 					>
 						<Button
 							variant="ghost"
@@ -299,13 +304,13 @@ export function ConnectionScreen() {
 									handleConnect(connection);
 								}
 							}}
-							className="flex justify-between p-4 w-full text-left hover:bg-muted/40 h-auto cursor-pointer"
+              className="flex justify-between p-4 w-full text-left hover:bg-muted/50 h-auto cursor-pointer transition-colors"
 						>
 							<div className="flex-1">
 								<div className="flex items-center gap-2">
 									{getConnectionIcon(connection)}
-									<h3 className="text-base font-medium">{connection.name}</h3>
-									<span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                  <h3 className="text-base font-semibold">{connection.name}</h3>
+                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full border border-border/70">
 										{DATABASE_TYPE_MAP[connection.dbType].name}
 									</span>
 								</div>
@@ -349,155 +354,160 @@ export function ConnectionScreen() {
 			);
 		}
 
-		return (
-			<>
-				<div className="flex justify-between items-center mb-4">
-					<h2 className="text-lg font-medium">AI Integration Settings</h2>
-					<Button
-						variant="default"
-						size="sm"
-						onClick={handleSaveSettings}
-						disabled={isSaving}
-						className="flex items-center gap-1.5"
-					>
-						{isSaving ? "Saving..." : "Save Changes"}
-					</Button>
-				</div>
+        return (
+          <>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  AI Settings
+                </p>
+                <h2 className="text-xl font-semibold">Integration</h2>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 shadow-sm"
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
 
-				<div className="bg-card rounded-lg shadow-sm border border-border p-4 sm:p-6">
-					<div className="grid gap-6">
-						<div>
-							<h3 className="text-base font-medium mb-3 sm:mb-4">API Keys</h3>
-							<p className="text-sm text-muted-foreground mb-4">
-								Enter your API keys to enable AI features in Data Deck. Your
-								keys are stored securely and encrypted.
-							</p>
+            <div className="bg-card/90 rounded-lg shadow-sm border border-border/70 p-5 sm:p-6">
+              <div className="grid gap-6">
+                <div>
+                  <h3 className="text-base font-semibold mb-2">API Keys</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Enter your API keys to enable AI features in Data Deck. Your
+                    keys are stored securely and encrypted.
+                  </p>
 
-							<div className="grid gap-4 sm:gap-6">
-								<div className="grid gap-2">
-									<Label
-										htmlFor="openai-key"
-										className="text-left flex items-center gap-1"
-									>
-										OpenAI API Key
-										<span
-											className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-												isKeyValid(openaiKey)
-													? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-													: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-											}`}
-										>
-											{isKeyValid(openaiKey) ? "Active" : "Not Set"}
-										</span>
-									</Label>
-									<div className="relative">
-										<Input
-											id="openai-key"
-											value={openaiKey}
-											onChange={(e) => setOpenaiKey(e.target.value)}
-											type={showOpenaiKey ? "text" : "password"}
-											className="pr-10"
-											placeholder="sk-..."
-										/>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="absolute right-0 top-0 h-full aspect-square"
-											onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-										>
-											{showOpenaiKey ? (
-												<EyeOff className="size-4" />
-											) : (
-												<Eye className="size-4" />
-											)}
-										</Button>
-									</div>
-									<p className="text-sm text-muted-foreground">
-										Used for GPT models like GPT-4.{" "}
-										<a
-											href="https://platform.openai.com/api-keys"
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-primary hover:underline"
-										>
-											Get your API key
-										</a>
-									</p>
-								</div>
+                  <div className="grid gap-5 sm:gap-6">
+                    <div className="grid gap-2">
+                      <Label
+                        htmlFor="openai-key"
+                        className="text-left flex items-center gap-2"
+                      >
+                        OpenAI API Key
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full border ${
+                            isKeyValid(openaiKey)
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300/40 dark:border-green-800/50"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300/50 dark:border-amber-800/60"
+                          }`}
+                        >
+                          {isKeyValid(openaiKey) ? "Active" : "Not Set"}
+                        </span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="openai-key"
+                          value={openaiKey}
+                          onChange={(e) => setOpenaiKey(e.target.value)}
+                          type={showOpenaiKey ? "text" : "password"}
+                          className="pr-12"
+                          placeholder="sk-..."
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full aspect-square"
+                          onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                        >
+                          {showOpenaiKey ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Used for GPT models like GPT-4.{" "}
+                        <a
+                          href="https://platform.openai.com/api-keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          Get your API key
+                        </a>
+                      </p>
+                    </div>
 
-								<div className="grid gap-2">
-									<Label
-										htmlFor="claude-key"
-										className="text-left flex items-center gap-1"
-									>
-										Anthropic Claude API Key
-										<span
-											className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-												isKeyValid(claudeKey)
-													? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-													: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-											}`}
-										>
-											{isKeyValid(claudeKey) ? "Active" : "Not Set"}
-										</span>
-									</Label>
-									<div className="relative">
-										<Input
-											id="claude-key"
-											value={claudeKey}
-											onChange={(e) => setClaudeKey(e.target.value)}
-											type={showClaudeKey ? "text" : "password"}
-											className="pr-10"
-											placeholder="sk-ant-..."
-										/>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="absolute right-0 top-0 h-full aspect-square"
-											onClick={() => setShowClaudeKey(!showClaudeKey)}
-										>
-											{showClaudeKey ? (
-												<EyeOff className="size-4" />
-											) : (
-												<Eye className="size-4" />
-											)}
-										</Button>
-									</div>
-									<p className="text-sm text-muted-foreground">
-										Used for Claude models.{" "}
-										<a
-											href="https://console.anthropic.com/settings/keys"
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-primary hover:underline"
-										>
-											Get your API key
-										</a>
-									</p>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</>
-		);
+                    <div className="grid gap-2">
+                      <Label
+                        htmlFor="claude-key"
+                        className="text-left flex items-center gap-2"
+                      >
+                        Anthropic Claude API Key
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full border ${
+                            isKeyValid(claudeKey)
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300/40 dark:border-green-800/50"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300/50 dark:border-amber-800/60"
+                          }`}
+                        >
+                          {isKeyValid(claudeKey) ? "Active" : "Not Set"}
+                        </span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="claude-key"
+                          value={claudeKey}
+                          onChange={(e) => setClaudeKey(e.target.value)}
+                          type={showClaudeKey ? "text" : "password"}
+                          className="pr-12"
+                          placeholder="sk-ant-..."
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full aspect-square"
+                          onClick={() => setShowClaudeKey(!showClaudeKey)}
+                        >
+                          {showClaudeKey ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Used for Claude models.{" "}
+                        <a
+                          href="https://console.anthropic.com/settings/keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          Get your API key
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        );
 	};
 
 	return (
 		<Layout title="Data Deck" showThemeToggle={false}>
-			<div className="flex-1 p-4 overflow-auto">
-				<div className="max-w-4xl mx-auto">
-					<div className="border-b border-border mb-6">
-						<div className="flex space-x-4 sm:space-x-6">
+			<div className="flex-1 p-6 overflow-auto bg-gradient-to-b from-background via-background/95 to-background/90">
+				<div className="max-w-4xl mx-auto space-y-6">
+					<div className="bg-card/90 border border-border/70 shadow-sm rounded-lg px-4 py-3">
+						<div className="flex space-x-2 sm:space-x-3">
 							<button
 								type="button"
 								onClick={() => setActiveTab("connections")}
-								className={`flex items-center gap-1 sm:gap-2 px-1 py-3 border-b-2 font-medium text-sm transition-colors ${
+								className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
 									activeTab === "connections"
-										? "border-primary text-primary"
-										: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+										? "bg-primary text-primary-foreground shadow-sm"
+										: "text-muted-foreground hover:bg-muted"
 								}`}
 							>
 								<FiDatabase className="size-4" />
@@ -506,10 +516,10 @@ export function ConnectionScreen() {
 							<button
 								type="button"
 								onClick={() => setActiveTab("settings")}
-								className={`flex items-center gap-1 sm:gap-2 px-1 py-3 border-b-2 font-medium text-sm transition-colors ${
+								className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
 									activeTab === "settings"
-										? "border-primary text-primary"
-										: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+										? "bg-primary text-primary-foreground shadow-sm"
+										: "text-muted-foreground hover:bg-muted"
 								}`}
 							>
 								<Settings className="size-4" />

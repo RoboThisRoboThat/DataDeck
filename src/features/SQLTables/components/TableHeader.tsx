@@ -42,14 +42,14 @@ const TableHeader = ({
     const activeFilters = Object.entries(filters).map(([column, filter]) => (
       <div
         key={`filter-${column}`}
-        className="flex items-center bg-blue-50 text-blue-700 text-sm rounded-full px-3 py-1 mr-2 mb-2"
+        className="flex items-center bg-primary/10 text-primary text-sm rounded-full px-3 py-1 mr-2 mb-2 border border-primary/30"
       >
         <span className="font-medium mr-1">{column}</span>
         <span className="mr-2">{formatFilterDisplay(filter.operator, filter.value)}</span>
         <button
           type="button"
           onClick={() => onRemoveFilter(column)}
-          className="hover:bg-blue-100 rounded-full p-1"
+          className="hover:bg-primary/15 rounded-full p-1"
           aria-label={`Remove filter for ${column}`}
         >
           <IoClose className="w-3 h-3" />
@@ -60,7 +60,7 @@ const TableHeader = ({
     const sortChip = sortConfig.column && sortConfig.direction && (
       <div
         key="sort-chip"
-        className="flex items-center bg-purple-50 text-purple-700 text-sm rounded-full px-3 py-1 mr-2 mb-2"
+        className="flex items-center bg-primary/10 text-primary text-sm rounded-full px-3 py-1 mr-2 mb-2 border border-primary/30"
       >
         <span className="font-medium mr-1">{sortConfig.column}</span>
         <span className="mr-2 flex items-center">
@@ -86,20 +86,20 @@ const TableHeader = ({
   };
 
   return (
-    <div className="p-6 pb-4">
+    <div className="p-6 pb-4 bg-card rounded-t-md border-b border-border/60">
       {/* Header and Controls */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-2xl font-semibold text-gray-800">{tableName}</h2>
+        <h2 className="text-2xl font-semibold text-foreground">{tableName}</h2>
         
         {/* Pagination Controls */}
         <div className="flex items-center space-x-6">
           {/* Rows per page selector */}
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Rows per page:</span>
+            <span className="text-sm text-muted-foreground">Rows per page:</span>
             <select
               value={pagination.rowsPerPage}
               onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-              className="border rounded px-2 py-1 text-sm"
+              className="border rounded px-2 py-1 text-sm bg-card text-foreground border-border focus:outline-none focus:ring-2 focus:ring-primary/60"
               aria-label="Rows per page"
             >
               <option value={50}>50</option>
@@ -111,7 +111,7 @@ const TableHeader = ({
 
           {/* Page navigation */}
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-muted-foreground">
               {pagination.page * pagination.rowsPerPage + 1}-
               {Math.min((pagination.page + 1) * pagination.rowsPerPage, totalRows)} of{' '}
               {totalRows.toLocaleString()} rows
@@ -121,7 +121,7 @@ const TableHeader = ({
                 type="button"
                 onClick={() => onPageChange(pagination.page - 1)}
                 disabled={pagination.page === 0}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Previous page"
               >
                 <IoChevronBack className="w-5 h-5" />
@@ -130,7 +130,7 @@ const TableHeader = ({
                 type="button"
                 onClick={() => onPageChange(pagination.page + 1)}
                 disabled={(pagination.page + 1) * pagination.rowsPerPage >= totalRows}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Next page"
               >
                 <IoChevronForward className="w-5 h-5" />

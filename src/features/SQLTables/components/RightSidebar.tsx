@@ -692,11 +692,11 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	};
 
 	return (
-		<div className="w-72 min-w-72 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">
+		<div className="w-72 min-w-72 bg-panel border-l border-border/60 flex flex-col h-full">
 			{/* Sticky header with search bar */}
-			<div className="sticky top-0 z-10 p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+			<div className="sticky top-0 z-10 p-4 border-b border-border/60 bg-panel">
 				<div className="flex justify-between items-center mb-3">
-					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+					<h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-[0.18em]">
 						Row Details
 					</h2>
 				</div>
@@ -714,7 +714,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 							placeholder="Search columns..."
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-9 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600"
+							className="pl-9 text-sm bg-card text-foreground border-border focus-visible:ring-2 focus-visible:ring-primary/60"
 						/>
 					</div>
 
@@ -765,14 +765,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 			{/* Empty states */}
 			{!activeTable && (
-				<div className="flex flex-col items-center justify-center p-6 flex-1 text-gray-500 dark:text-gray-400 text-center">
+				<div className="flex flex-col items-center justify-center p-6 flex-1 text-muted-foreground text-center">
 					<FiDatabase className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">Select a table to view row details</p>
 				</div>
 			)}
 
 			{activeTable && !hasSelectedRowData && (
-				<div className="flex flex-col items-center justify-center p-6 flex-1 text-gray-500 dark:text-gray-400 text-center">
+				<div className="flex flex-col items-center justify-center p-6 flex-1 text-muted-foreground text-center">
 					<FiAlertCircle className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">
 						Click on a row in the table to view its details
@@ -796,21 +796,21 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 								return (
 									<div
 										key={column}
-										className="space-y-1 pb-2 border-b border-gray-100 dark:border-gray-700 mb-2"
+									className="space-y-1 pb-2 border-b border-border/50 mb-2"
 									>
 										<div className="flex justify-between items-center">
 											<label
 												htmlFor={`field-${column}`}
-												className="text-xs font-medium text-gray-700 dark:text-gray-300"
+											className="text-xs font-medium text-foreground"
 												title={column} // Show full column name on hover
 											>
 												{truncatedColumnName}
 												{isPrimaryKey(column) && (
-													<span className="ml-1 text-xs bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded">
+												<span className="ml-1 text-xs bg-primary/15 text-primary px-1 py-0.5 rounded">
 														PK
 													</span>
 												)}
-												<span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 py-0.5 rounded">
+												<span className="ml-1 text-xs bg-muted text-foreground px-1 py-0.5 rounded border border-border/60">
 													({columnType || "N/A"})
 												</span>
 											</label>
@@ -831,7 +831,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 										</div>
 
 										{isNull ? (
-											<div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-400 dark:text-gray-500 italic">
+												<div className="w-full px-3 py-2 border border-border bg-muted rounded-md text-sm text-muted-foreground italic">
 												NULL
 											</div>
 										) : inputType === "json" ? (
@@ -880,8 +880,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 															: undefined
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
-													${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20" : ""}
+													${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
+													${!isValidDate(value) && !(column in editedValues) ? "border-amber-400 bg-amber-50/60" : ""}
 												`}
 												/>
 												{!isValidDate(value) && !(column in editedValues) && (
@@ -907,7 +907,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 														: undefined
 												}
 												className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+												${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
 											`}
 											/>
 										) : (
@@ -927,7 +927,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 														: undefined
 												}
 												className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+												${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
 											`}
 											/>
 										)}
@@ -939,7 +939,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 					{/* Sticky save button at the bottom */}
 					{primaryKeys.length > 0 && (
-						<div className="sticky bottom-0 z-10 p-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center">
+						<div className="sticky bottom-0 z-10 p-3 bg-panel border-t border-border/60 flex justify-center">
 							<Button
 								variant="default"
 								className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"

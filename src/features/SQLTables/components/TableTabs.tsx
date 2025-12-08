@@ -112,15 +112,15 @@ const TableTabs: React.FC<TableTabsProps> = ({
 		}
 	};
 
-	return (
-		<div className="flex items-center border-b border-border bg-muted/20">
+  return (
+    <div className="flex items-center border-b border-border/70 bg-card/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
 			{/* Left Scroll Button */}
 			{showScrollButtons.left && (
 				<Button
 					variant="ghost"
 					size="icon"
 					onClick={() => scrollTabs("left")}
-					className="flex-none p-0 h-9 w-9 rounded-none text-foreground hover:bg-muted/50"
+          className="flex-none p-0 h-9 w-9 rounded-none text-foreground hover:bg-muted"
 				>
 					<IoChevronBack className="w-4 h-4" />
 				</Button>
@@ -129,7 +129,7 @@ const TableTabs: React.FC<TableTabsProps> = ({
 			{/* Scrollable Tabs Container */}
 			<div
 				ref={tabsRef}
-				className="flex-1 flex overflow-x-auto scrollbar-hide"
+        className="flex-1 flex overflow-x-auto scrollbar-hide"
 				onScroll={checkScrollButtons}
 			>
 				{tables.map((table) => (
@@ -137,12 +137,12 @@ const TableTabs: React.FC<TableTabsProps> = ({
 						key={table}
 						variant="ghost"
 						onClick={() => setActiveTable(table)}
-						className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm transition-colors mx-[1px]
+            className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm transition-colors mx-[1px]
               ${
-								activeTable === table
-									? "bg-white dark:bg-slate-800 border-t-[3px] border-t-primary border-x border-x-border rounded-t-md border-b-0 text-foreground font-semibold shadow-md z-10"
-									: "text-muted-foreground hover:bg-muted/70 border-b border-border rounded-none"
-							}`}
+                activeTable === table
+                  ? "bg-card border border-border/70 rounded-md text-foreground font-semibold shadow-sm z-10"
+                  : "text-muted-foreground hover:bg-muted rounded-md"
+              }`}
 					>
 						<span className="max-w-[150px] truncate">{table}</span>
 						<Button
