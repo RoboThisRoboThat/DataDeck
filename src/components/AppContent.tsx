@@ -1,7 +1,7 @@
 import { useScreen } from "../context/ScreenContext";
 import { ConnectionScreen } from "../screens/ConnectionScreen";
 import { TablesScreen } from "../screens/TablesScreen";
-import { RedisScreen } from "../screens/RedisScreen";
+import { RedisScreen } from "../features/Redis";
 
 export function AppContent() {
 	const { currentScreen } = useScreen();

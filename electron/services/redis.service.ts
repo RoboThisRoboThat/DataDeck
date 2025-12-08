@@ -1,5 +1,14 @@
 import Redis, { type RedisOptions } from "ioredis";
 import { EventEmitter } from "node:events";
+import type {
+	RedisConfig,
+	RedisKeyValue,
+	RedisServerInfo,
+	RedisClientInfo,
+	RedisConnectResult,
+	RedisCommandResult,
+	RedisInputValue,
+} from "../../src/types/redis";
 
 interface RedisConnection {
 	id: string;
@@ -15,8 +24,8 @@ class RedisService extends EventEmitter {
 	 */
 	async connect(
 		connectionId: string,
-		config: any,
-	): Promise<{ success: boolean; message: string }> {
+		config: RedisConfig,
+	): Promise<RedisConnectResult> {
 		try {
 			// Disconnect if already connected
 			if (this.connections.has(connectionId)) {
@@ -25,10 +34,10 @@ class RedisService extends EventEmitter {
 
 			const options: RedisOptions = {
 				host: config.host || "localhost",
-				port: Number.parseInt(config.port || "6379", 10),
+				port: Number.parseInt(String(config.port || "6379"), 10),
 				username: config.username || undefined,
 				password: config.password || undefined,
-				db: Number.parseInt(config.database || "0", 10),
+				db: Number.parseInt(config.database || config.db?.toString() || "0", 10),
 				connectTimeout: 10000,
 				lazyConnect: true,
 			};
@@ -168,7 +177,8 @@ class RedisService extends EventEmitter {
 			// Get memory usage (if available)
 			let size = 0;
 			try {
-				size = await connection.client.call("MEMORY", "USAGE", key);
+				const memoryResult = await connection.client.call("MEMORY", "USAGE", key);
+				size = typeof memoryResult === "number" ? memoryResult : 0;
 			} catch (err) {
 				// MEMORY USAGE may not be available in older Redis versions
 				console.warn("MEMORY USAGE command failed, may not be supported:", err);
@@ -198,7 +208,7 @@ class RedisService extends EventEmitter {
 	async getKeyValue(
 		connectionId: string,
 		key: string,
-	): Promise<{ type: string; value: any }> {
+	): Promise<RedisKeyValue> {
 		try {
 			const connection = this.connections.get(connectionId);
 			if (!connection) {
@@ -240,7 +250,7 @@ class RedisService extends EventEmitter {
 					throw new Error(`Unsupported Redis data type: ${type}`);
 			}
 
-			return { type, value };
+			return { type, value } as RedisKeyValue;
 		} catch (error) {
 			console.error("Redis getKeyValue error:", error);
 			throw error;
@@ -254,14 +264,14 @@ class RedisService extends EventEmitter {
 		connectionId: string,
 		command: string,
 		args: string[],
-	): Promise<any> {
+	): Promise<RedisCommandResult> {
 		try {
 			const connection = this.connections.get(connectionId);
 			if (!connection) {
 				throw new Error("Redis connection not found");
 			}
 
-			return await connection.client.call(command, ...args);
+			return await connection.client.call(command, ...args) as RedisCommandResult;
 		} catch (error) {
 			console.error("Redis executeCommand error:", error);
 			throw error;
@@ -274,7 +284,7 @@ class RedisService extends EventEmitter {
 	async setKeyValue(
 		connectionId: string,
 		key: string,
-		value: any,
+		value: RedisInputValue,
 		type: string,
 	): Promise<boolean> {
 		try {
@@ -285,7 +295,7 @@ class RedisService extends EventEmitter {
 
 			switch (type.toLowerCase()) {
 				case "string":
-					await connection.client.set(key, value);
+					await connection.client.set(key, value as string);
 					break;
 				case "list":
 					// Assume value is an array
@@ -294,8 +304,8 @@ class RedisService extends EventEmitter {
 					}
 					// Delete the key first to ensure we start with a fresh list
 					await connection.client.del(key);
-					if (value.length > 0) {
-						await connection.client.rpush(key, ...value);
+					if ((value as string[]).length > 0) {
+						await connection.client.rpush(key, ...(value as string[]));
 					}
 					break;
 				case "set":
@@ -305,8 +315,8 @@ class RedisService extends EventEmitter {
 					}
 					// Delete the key first to ensure we start with a fresh set
 					await connection.client.del(key);
-					if (value.length > 0) {
-						await connection.client.sadd(key, ...value);
+					if ((value as string[]).length > 0) {
+						await connection.client.sadd(key, ...(value as string[]));
 					}
 					break;
 				case "hash":
@@ -354,7 +364,7 @@ class RedisService extends EventEmitter {
 	/**
 	 * Get server info
 	 */
-	async getServerInfo(connectionId: string): Promise<any> {
+	async getServerInfo(connectionId: string): Promise<RedisServerInfo> {
 		try {
 			const connection = this.connections.get(connectionId);
 			if (!connection) {
@@ -364,7 +374,7 @@ class RedisService extends EventEmitter {
 			const info = await connection.client.info();
 
 			// Parse the INFO response into a structured object
-			const result: Record<string, any> = {};
+			const result: RedisServerInfo = {};
 			const sections = info.split("#");
 
 			for (const section of sections) {
@@ -401,17 +411,17 @@ class RedisService extends EventEmitter {
 	/**
 	 * Get client list
 	 */
-	async getClients(connectionId: string): Promise<any[]> {
+	async getClients(connectionId: string): Promise<RedisClientInfo[]> {
 		try {
 			const connection = this.connections.get(connectionId);
 			if (!connection) {
 				throw new Error("Redis connection not found");
 			}
 
-			const clientListStr = await connection.client.client("LIST");
+			const clientListStr = await connection.client.client("LIST") as string;
 			const clientList = clientListStr.split("\n").filter(Boolean);
 
-			return clientList.map((client) => {
+			return clientList.map((client: string) => {
 				const clientObj: Record<string, string> = {};
 				const properties = client.split(" ");
 

@@ -1,31 +1,10 @@
 import Store from "electron-store";
 import type { Connection } from "../../src/types/connection";
 import type { AppSettings, AISettings } from "../../src/types/settings";
+import type { TableSchema } from "../../src/types/shared";
 import DatabaseService from "./database.service";
 import redisService from "./redis.service";
 
-// Define TableSchema interface
-interface TableSchemaColumn {
-	name: string;
-	type: string;
-	length?: number;
-	precision?: number;
-	isPrimary: boolean;
-	isNullable: boolean;
-	defaultValue?: string;
-}
-
-interface TableSchemaForeignKey {
-	column: string;
-	referencedTable: string;
-	referencedColumn: string;
-}
-
-interface TableSchema {
-	name: string;
-	columns: TableSchemaColumn[];
-	foreignKeys: TableSchemaForeignKey[];
-}
 
 interface StoreSchema {
 	connections: Connection[];
@@ -333,7 +312,7 @@ export const storeService = {
 			...baseResult,
 			connected: false,
 			success: false,
-			message: `Unsupported connection type: ${connection.dbType}`,
+			message: `Unsupported connection type: ${connection.dbType} `,
 		};
 	},
 
@@ -342,7 +321,7 @@ export const storeService = {
 	async query(connectionId: string, sql: string) {
 		const service = activeConnections.get(connectionId);
 		if (!service) {
-			throw new Error(`No active connection for ID: ${connectionId}`);
+			throw new Error(`No active connection for ID: ${connectionId} `);
 		}
 
 		return await service.query(sql);
@@ -357,15 +336,15 @@ export const storeService = {
 		}
 
 		if (!activeConnections.has(connectionId)) {
-			console.error(`No active connection found for ID: ${connectionId}`);
+			console.error(`No active connection found for ID: ${connectionId} `);
 			console.log("Active connections:", Array.from(activeConnections.keys()));
-			throw new Error(`No active connection for ID: ${connectionId}`);
+			throw new Error(`No active connection for ID: ${connectionId} `);
 		}
 
 		const service = activeConnections.get(connectionId);
 		if (!service) {
 			throw new Error(
-				`Database service not found for connection: ${connectionId}`,
+				`Database service not found for connection: ${connectionId} `,
 			);
 		}
 
@@ -376,7 +355,7 @@ export const storeService = {
 	async tableExists(connectionId: string, tableName: string) {
 		const service = activeConnections.get(connectionId);
 		if (!service) {
-			throw new Error(`No active connection for ID: ${connectionId}`);
+			throw new Error(`No active connection for ID: ${connectionId} `);
 		}
 
 		return await service.tableExists(tableName);
@@ -448,7 +427,7 @@ export const storeService = {
 		try {
 			// Get existing queries for this connection
 			const connectionQueries = queryStore.get(
-				`queries.${connectionId}`,
+				`queries.${connectionId} `,
 				{} as Record<string, SavedQuery>,
 			);
 
@@ -461,7 +440,7 @@ export const storeService = {
 			};
 
 			// Save to store
-			queryStore.set(`queries.${connectionId}`, connectionQueries);
+			queryStore.set(`queries.${connectionId} `, connectionQueries);
 
 			return { success: true, shouldRefresh };
 		} catch (error) {
@@ -478,7 +457,7 @@ export const storeService = {
 		try {
 			// Get queries for this connection
 			const connectionQueries = queryStore.get(
-				`queries.${connectionId}`,
+				`queries.${connectionId} `,
 				{} as Record<string, SavedQuery>,
 			);
 
@@ -493,7 +472,7 @@ export const storeService = {
 					sql: "",
 					createdAt: new Date().toISOString(),
 				};
-				queryStore.set(`queries.${connectionId}`, connectionQueries);
+				queryStore.set(`queries.${connectionId} `, connectionQueries);
 
 				// Add to the array
 				queriesArray.push(connectionQueries["Unsaved Query"]);
@@ -526,7 +505,7 @@ export const storeService = {
 		try {
 			// Get existing queries for this connection
 			const connectionQueries = queryStore.get(
-				`queries.${connectionId}`,
+				`queries.${connectionId} `,
 				{} as Record<string, SavedQuery>,
 			);
 
@@ -534,7 +513,7 @@ export const storeService = {
 			delete connectionQueries[name];
 
 			// Save to store
-			queryStore.set(`queries.${connectionId}`, connectionQueries);
+			queryStore.set(`queries.${connectionId} `, connectionQueries);
 
 			return { success: true };
 		} catch (error) {
@@ -576,7 +555,7 @@ export const storeService = {
 	cancelQuery: async (connectionId: string) => {
 		const service = activeConnections.get(connectionId);
 		if (!service) {
-			throw new Error(`No active connection for ID: ${connectionId}`);
+			throw new Error(`No active connection for ID: ${connectionId} `);
 		}
 		return await service.cancelQuery();
 	},
@@ -672,7 +651,7 @@ export const storeService = {
 		// If no cache or force refresh, get fresh data
 		console.log(`Fetching fresh schema for connection ${connectionId}`);
 		if (!service) {
-			throw new Error(`No active connection for ID: ${connectionId}`);
+			throw new Error(`No active connection for ID: ${connectionId} `);
 		}
 
 		// Get fresh schema

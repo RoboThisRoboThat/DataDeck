@@ -1,6 +1,22 @@
 import { ipcRenderer, contextBridge } from "electron";
 import type { Connection } from "../src/types/connection";
 import type { AppSettings, AISettings } from "../src/types/settings";
+import type {
+	RedisConfig,
+	RedisKeyValue,
+	RedisKeyInfo,
+	RedisKeysResult,
+	RedisServerInfo,
+	RedisClientInfo,
+	RedisConnectResult,
+	RedisDisconnectResult,
+	RedisSelectDbResult,
+	RedisDatabaseCountResult,
+	RedisCurrentDbResult,
+	RedisPopulatedDbsResult,
+	RedisCommandResult,
+	RedisInputValue,
+} from "../src/types/redis";
 
 // Define types for database query results
 type QueryResult = Record<string, unknown>;
@@ -143,56 +159,48 @@ interface API {
 	getOpenWindows: () => Promise<Record<string, boolean>>;
 }
 
-// Define Redis interface
+// Define Redis interface using shared types
 interface Redis {
 	connect: (
 		connectionId: string,
-		config: any,
-	) => Promise<{ success: boolean; message: string }>;
-	disconnect: (
-		connectionId: string,
-	) => Promise<{ success: boolean; message?: string }>;
+		config: RedisConfig,
+	) => Promise<RedisConnectResult>;
+	disconnect: (connectionId: string) => Promise<RedisDisconnectResult>;
 	getKeys: (
 		connectionId: string,
 		pattern?: string,
 		cursor?: string,
 		count?: number,
-	) => Promise<{ keys: string[]; cursor: string }>;
-	getKeyInfo: (
-		connectionId: string,
-		key: string,
-	) => Promise<{ type: string; ttl: number; size: number }>;
-	getKeyValue: (
-		connectionId: string,
-		key: string,
-	) => Promise<{ type: string; value: any }>;
+	) => Promise<RedisKeysResult>;
+	getKeyInfo: (connectionId: string, key: string) => Promise<RedisKeyInfo>;
+	getKeyValue: (connectionId: string, key: string) => Promise<RedisKeyValue>;
 	deleteKey: (connectionId: string, key: string) => Promise<boolean>;
 	executeCommand: (
 		connectionId: string,
 		command: string,
 		args: string[],
-	) => Promise<any>;
-	getServerInfo: (connectionId: string) => Promise<any>;
-	getClients: (connectionId: string) => Promise<any[]>;
+	) => Promise<RedisCommandResult>;
+	getServerInfo: (connectionId: string) => Promise<RedisServerInfo>;
+	getClients: (connectionId: string) => Promise<RedisClientInfo[]>;
 	setKeyValue: (
 		connectionId: string,
 		key: string,
-		value: any,
+		value: RedisInputValue,
 		type: string,
 	) => Promise<boolean>;
 	selectDatabase: (
 		connectionId: string,
 		dbNumber: number,
-	) => Promise<{ success: boolean; message: string }>;
+	) => Promise<RedisSelectDbResult>;
 	getDatabaseCount: (
 		connectionId: string,
-	) => Promise<{ success: boolean; count: number; message?: string }>;
+	) => Promise<RedisDatabaseCountResult>;
 	getCurrentDatabase: (
 		connectionId: string,
-	) => Promise<{ success: boolean; db: number; message?: string }>;
+	) => Promise<RedisCurrentDbResult>;
 	getPopulatedDatabases: (
 		connectionId: string,
-	) => Promise<{ success: boolean; databases: number[]; message?: string }>;
+	) => Promise<RedisPopulatedDbsResult>;
 }
 
 contextBridge.exposeInMainWorld("database", {
@@ -444,13 +452,4 @@ contextBridge.exposeInMainWorld("redis", {
 	},
 });
 
-// Type declarations for TypeScript
-declare global {
-	interface Window {
-		database: Database;
-		store: Store;
-		windowManager: WindowManager;
-		api: API;
-		redis: Redis;
-	}
-}
+// Note: Window type declarations are centralized in src/types/window.d.ts
