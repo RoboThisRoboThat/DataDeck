@@ -1,7 +1,9 @@
 import { ScreenProvider } from './context/ScreenContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { SettingsProvider } from './context/SettingsContext'
+import { ErrorProvider } from './context/ErrorContext'
 import { AppContent } from './components/AppContent'
+import { ErrorModal } from './components/ErrorModal'
 import { Toaster } from './components/ui/toast'
 import './App.css'
 import { Suspense } from 'react'
@@ -22,12 +24,15 @@ function App() {
   return (
     <ThemeProvider>
       <Suspense fallback={<Loading />}>
-        <SettingsProvider>
-          <ScreenProvider>
-            <AppContent />
-            <Toaster />
-          </ScreenProvider>
-        </SettingsProvider>
+        <ErrorProvider>
+          <SettingsProvider>
+            <ScreenProvider>
+              <AppContent />
+              <Toaster />
+              <ErrorModal />
+            </ScreenProvider>
+          </SettingsProvider>
+        </ErrorProvider>
       </Suspense>
     </ThemeProvider>
   )

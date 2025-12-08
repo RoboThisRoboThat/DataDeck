@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useRef, useCallback, useMemo, memo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
 	FiDatabase,
 	FiAlertCircle,
-	FiSave,
 	FiSearch,
 	FiCopy,
 	FiMoreVertical,
@@ -26,12 +25,11 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-	fetchTableData,
-	setSelectedRow,
+	setPendingChange,
 } from "../../../store/slices/tablesSlice";
 import Editor from "@monaco-editor/react";
-import type { TableDataRow } from "../types";
 import CopyRowModal from "./CopyRowModal";
+import { getRowKey } from "../utils/rowKey";
 
 interface RightSidebarProps {
 	connectionId: string;
@@ -61,24 +59,22 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	const structure = useAppSelector((state) =>
 		activeTable ? state.tables.tables[activeTable]?.structure ?? [] : [],
 	);
-
-	// Get filters, sortConfig, pagination only when needed for saving
-	const tableState = useAppSelector((state) =>
-		activeTable ? state.tables.tables[activeTable] : null,
+	
+	const pendingChanges = useAppSelector((state) => 
+		activeTable ? state.tables.tables[activeTable]?.pendingChanges || {} : {}
 	);
-	// State for editing mode - always in edit mode
-	const [editedValues, setEditedValues] = useState<Record<string, unknown>>({});
-	const [showConfirmModal, setShowConfirmModal] = useState(false);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+
+	// Derived state
+	const selectedRowKey = useMemo(() => 
+		selectedRow && primaryKeys.length > 0 ? getRowKey(selectedRow, primaryKeys) : null
+	, [selectedRow, primaryKeys]);
+
+	// State for UI
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showCopyRowModal, setShowCopyRowModal] = useState(false);
 	const [jsonModalOpen, setJsonModalOpen] = useState(false);
 	const [activeJsonColumn, setActiveJsonColumn] = useState<string | null>(null);
 	const [jsonEditorValue, setJsonEditorValue] = useState<string>("");
-	// Monaco instance for future extensions (monaco editor customization)
-	// TODO: Use this when implementing custom editor features
-	// const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
 
 	// Memoize filtered columns to prevent recalculation on every render
 	const filteredColumns = useMemo(() => {
@@ -88,14 +84,6 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			column.toLowerCase().includes(searchLower),
 		);
 	}, [columns, searchQuery]);
-
-	// Reset edited values when selected row changes
-	useEffect(() => {
-		if (selectedRow) {
-			// Only reset when we have a new row
-			setEditedValues({});
-		}
-	}, [selectedRow]);
 
 	// Format value for display
 	const formatValue = (value: unknown): string => {
@@ -111,43 +99,50 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		return String(value);
 	};
 
-	// Check if the value is a JSON object or array
-	const isJsonValue = (value: unknown): boolean => {
-		return (
-			typeof value === "object" && value !== null && !(value instanceof Date)
-		);
-	};
-
 	// Determine if we have selected row data to display
 	const hasSelectedRowData = !!selectedRow;
 
-	// Handle input change - memoized
-	const handleInputChange = useCallback((column: string, value: string) => {
-		setEditedValues((prev) => ({
-			...prev,
-			[column]: value,
-		}));
-	}, []);
+	// Helper to get effective value (pending or original)
+	const getEffectiveValue = useCallback((column: string) => {
+		if (!selectedRowKey || !pendingChanges[selectedRowKey]) {
+			return selectedRow?.[column];
+		}
+		const change = pendingChanges[selectedRowKey].changes[column];
+		return change ? change.value : selectedRow?.[column];
+	}, [selectedRow, selectedRowKey, pendingChanges]);
 
-	// Handle Monaco editor change - memoized
+	// Handle input change - now updates global pending state
+	const handleInputChange = useCallback((column: string, value: string) => {
+		if (!activeTable || !selectedRowKey || !selectedRow) return;
+
+		// Simple type inference or keep as string (same as TableRow logic)
+		// Ideally we should use column type from structure to parse correctly
+		let parsedValue: unknown = value;
+		
+		// Logic to respect empty string vs null if needed, 
+		// but sticking to string for input is safer for now.
+
+		const primaryKeyValues: Record<string, unknown> = {};
+		primaryKeys.forEach(pk => {
+			primaryKeyValues[pk] = selectedRow[pk];
+		});
+
+		dispatch(setPendingChange({
+			tableName: activeTable,
+			rowKey: selectedRowKey,
+			primaryKeyValues,
+			column,
+			value: parsedValue,
+			originalValue: selectedRow[column]
+		}));
+	}, [activeTable, selectedRow, selectedRowKey, primaryKeys, dispatch]);
+
+	// Handle Monaco editor change
 	const handleMonacoChange = useCallback((column: string, value: string | undefined) => {
 		if (value !== undefined) {
-			setEditedValues((prev) => ({
-				...prev,
-				[column]: value,
-			}));
+			handleInputChange(column, value);
 		}
-	}, []);
-
-	// Handle save button click
-	const handleSaveClick = () => {
-		if (Object.keys(editedValues).length === 0) {
-			// Nothing to save
-			return;
-		}
-
-		setShowConfirmModal(true);
-	};
+	}, [handleInputChange]);
 
 	// Check if a column is a primary key
 	const isPrimaryKey = (column: string): boolean => {
@@ -192,6 +187,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 		return "text";
 	};
+
 
 	// Format date for input
 	const formatDateForInput = (value: unknown, inputType: string): string => {
@@ -248,293 +244,6 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		return typeof value === "string" ? value : String(value);
 	};
 
-	// Parse value according to original type
-	const parseValue = (column: string, value: string | null): unknown => {
-		if (!selectedRow) return value;
-		if (value === null) return null;
-
-		const originalValue = selectedRow[column];
-		const columnType = getColumnType(column).toLowerCase();
-
-		// If value is empty string and not a string type, return null
-		if (
-			value === "" &&
-			!columnType.includes("char") &&
-			!columnType.includes("text")
-		) {
-			return null;
-		}
-
-		// Handle different data types
-		if (
-			columnType.includes("int") ||
-			columnType.includes("float") ||
-			columnType.includes("double") ||
-			columnType.includes("decimal") ||
-			columnType.includes("numeric")
-		) {
-			const parsedNumber = Number(value);
-			if (!Number.isNaN(parsedNumber)) return parsedNumber;
-			return value === "" ? null : value;
-		}
-
-		// Handle date and datetime types
-		if (
-			columnType.includes("date") ||
-			columnType.includes("timestamp") ||
-			columnType.includes("time")
-		) {
-			// For empty strings, return null for date fields
-			if (value === "") return null;
-
-			try {
-				// Try to create a valid date
-				const dateObj = new Date(value);
-
-				// Check if date is valid
-				if (!Number.isNaN(dateObj.getTime())) {
-					// Return ISO string for timestamp/datetime or just the date part for date
-					if (
-						columnType.includes("timestamp") ||
-						columnType.includes("datetime")
-					) {
-						return dateObj.toISOString();
-					}
-
-					if (columnType.includes("date")) {
-						return dateObj.toISOString().split("T")[0];
-					}
-
-					if (columnType.includes("time")) {
-						return dateObj.toISOString().split("T")[1].split(".")[0];
-					}
-				}
-
-				// If we couldn't parse it as a date, return the original string
-				return value;
-			} catch (e) {
-				console.warn(`Failed to parse date value: ${value}`, e);
-				return value;
-			}
-		}
-
-		// If original value is a boolean, parse as boolean
-		if (typeof originalValue === "boolean") {
-			if (value.toLowerCase() === "true") return true;
-			if (value.toLowerCase() === "false") return false;
-		}
-
-		// If it's a JSON type, parse as JSON
-		if (columnType.includes("json") || columnType.includes("array")) {
-			try {
-				return JSON.parse(value);
-			} catch (e) {
-				// Return as is if parsing fails
-				return value;
-			}
-		}
-
-		// Return as string for all other cases
-		return value;
-	};
-
-	// Save changes to the database
-	const saveChanges = async () => {
-		if (!selectedRow || !activeTable || primaryKeys.length === 0) return;
-
-		setLoading(true);
-		setError(null);
-
-		try {
-			// Get primary key column and value
-			const primaryKeyColumn = primaryKeys[0];
-			const primaryKeyValue = selectedRow[primaryKeyColumn];
-
-			// Check if primary key value is a string or number
-			if (
-				typeof primaryKeyValue !== "string" &&
-				typeof primaryKeyValue !== "number"
-			) {
-				throw new Error("Primary key value must be a string or number");
-			}
-
-			// Update each changed field
-			for (const [column, value] of Object.entries(editedValues)) {
-				// Skip primary key columns
-				if (isPrimaryKey(column)) continue;
-
-				// Parse the value according to its original type
-				const parsedValue =
-					value === null ? null : parseValue(column, value as string);
-
-				try {
-					// Dispatch update action but handle errors locally
-					await window.database.updateCell(
-						connectionId,
-						activeTable,
-						primaryKeyColumn,
-						primaryKeyValue,
-						column,
-						parsedValue,
-					);
-				} catch (err) {
-					// Extract the full error message from the API error
-					const errorMessage =
-						err instanceof Error
-							? err.message
-							: typeof err === "object" && err && "message" in err
-								? String(err.message)
-								: "Failed to save changes";
-
-					// If the error contains the full API error message, extract it
-					const match = errorMessage.match(
-						/Error invoking remote method '[^']+': (.+)/,
-					);
-					throw new Error(match ? match[1] : errorMessage);
-				}
-			}
-
-			// After successful save, refetch the table data
-			if (tableState) {
-				const { filters, sortConfig, pagination } = tableState;
-				// Explicitly type the response from unwrap
-				const response = (await dispatch(
-					fetchTableData({
-						tableName: activeTable,
-						connectionId,
-						filters,
-						sortConfig,
-						pagination,
-					}),
-				).unwrap()) as { data: TableDataRow[]; totalRows: number };
-
-				// Find the updated row in the new data using the primary key
-				const updatedRow = response.data.find(
-					(row: TableDataRow) => row[primaryKeyColumn] === primaryKeyValue,
-				);
-
-				// Update the selected row with the new data
-				if (updatedRow) {
-					dispatch(
-						setSelectedRow({
-							tableName: activeTable,
-							selectedRow: updatedRow,
-						}),
-					);
-				}
-			}
-
-			// Reset state after successful save
-			setEditedValues({});
-			setShowConfirmModal(false);
-		} catch (err) {
-			// Set the full error message
-			setError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	// Render the changes for confirmation
-	const renderChanges = () => {
-		return Object.entries(editedValues)
-			.map(([column, newValue]) => {
-				if (!selectedRow) return null;
-
-				const originalValue = selectedRow[column];
-				const formattedOriginal = formatValue(originalValue);
-				const formattedNew =
-					newValue === null
-						? "NULL"
-						: typeof newValue === "string"
-							? newValue
-							: formatValue(newValue);
-
-				// Skip unchanged values
-				if (
-					(originalValue === null && newValue === null) ||
-					(formattedOriginal === formattedNew && originalValue !== null)
-				) {
-					return null;
-				}
-
-				return (
-					<div
-						key={column}
-						className="mb-3 pb-3 border-b border-gray-100 dark:border-gray-800"
-					>
-						<h4 className="font-medium text-gray-700 dark:text-gray-300">
-							{column}
-						</h4>
-						<div className="grid grid-cols-2 gap-2 mt-1">
-							<div className="text-sm">
-								<span className="text-gray-500 dark:text-gray-400 block text-xs">
-									Original:
-								</span>
-								<div className="bg-gray-50 dark:bg-gray-800 p-1 rounded mt-1 max-h-20 overflow-auto">
-									{originalValue === null || originalValue === undefined ? (
-										<span className="text-gray-400 dark:text-gray-500 italic">
-											NULL
-										</span>
-									) : isJsonValue(originalValue) ? (
-										<pre className="text-xs text-gray-700 dark:text-gray-300">
-											{formattedOriginal}
-										</pre>
-									) : (
-										<span className="text-gray-700 dark:text-gray-300">
-											{formattedOriginal}
-										</span>
-									)}
-								</div>
-							</div>
-							<div className="text-sm">
-								<span className="text-gray-500 dark:text-gray-400 block text-xs">
-									New:
-								</span>
-								<div className="bg-blue-50 dark:bg-blue-900/20 p-1 rounded mt-1 max-h-20 overflow-auto">
-									{newValue === null ? (
-										<span className="text-gray-400 dark:text-gray-500 italic">
-											NULL
-										</span>
-									) : isJsonValue(originalValue) &&
-										typeof newValue === "string" ? (
-										<pre className="text-xs text-gray-700 dark:text-gray-300">
-											{newValue}
-										</pre>
-									) : (
-										<span className="text-gray-700 dark:text-gray-300">
-											{formattedNew}
-										</span>
-									)}
-								</div>
-							</div>
-						</div>
-					</div>
-				);
-			})
-			.filter(Boolean);
-	};
-
-	// Calculate if there are any actual changes
-	const hasChanges = (): boolean => {
-		if (!selectedRow) return false;
-
-		return Object.entries(editedValues).some(([column, newValue]) => {
-			const originalValue = selectedRow[column];
-
-			// Handle null values
-			if (originalValue === null && newValue === null) return false;
-			if (originalValue === null && newValue !== null) return true;
-			if (originalValue !== null && newValue === null) return true;
-
-			const formattedOriginal = formatValue(originalValue);
-			const formattedNew =
-				typeof newValue === "string" ? newValue : formatValue(newValue);
-
-			return formattedOriginal !== formattedNew;
-		});
-	};
-
 	// Truncate column name if it's too long
 	const truncateColumnName = (name: string, maxLength = 20): string => {
 		if (name.length <= maxLength) return name;
@@ -543,8 +252,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 
 	// Check if a value is null in the edited values or original data
 	const isValueNull = (column: string): boolean => {
-		if (column in editedValues) {
-			return editedValues[column] === null;
+		if (selectedRowKey && pendingChanges[selectedRowKey]?.changes[column]) {
+			return pendingChanges[selectedRowKey].changes[column].value === null;
 		}
 		return (
 			selectedRow?.[column] === null || selectedRow?.[column] === undefined
@@ -657,49 +366,16 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		{ enableOnFormTags: true },
 	);
 
-	// Save changes shortcut
-	useHotkeys(
-		"ctrl+s, cmd+s",
-		(event) => {
-			event.preventDefault();
-			// Only trigger save if there are changes to save and we're not already loading
-			if (hasChanges() && !loading) {
-				handleSaveClick();
-			}
-		},
-		{ enableOnFormTags: true },
-	);
-
-	// Handle Enter key in confirmation modal using react-hotkeys-hook
-	useHotkeys(
-		"enter",
-		(event) => {
-			// Only trigger if the modal is open and there are no errors and not loading
-			if (showConfirmModal && !error && !loading && hasChanges()) {
-				event.preventDefault();
-				if (!showConfirmModal) return;
-				saveChanges();
-			}
-		},
-		{
-			enableOnFormTags: true,
-			enabled: showConfirmModal,
-		},
-	);
-
 	// Open JSON editor modal - memoized
 	const handleOpenJsonModal = useCallback(
 		(column: string) => {
-			const value =
-				column in editedValues && editedValues[column] !== null
-					? (editedValues[column] as string)
-					: formatValue(selectedRow?.[column]);
-
-			setJsonEditorValue(value);
+			const value = getEffectiveValue(column);
+			const formattedValue = typeof value === 'string' ? value : formatValue(value);
+			setJsonEditorValue(formattedValue);
 			setActiveJsonColumn(column);
 			setJsonModalOpen(true);
 		},
-		[editedValues, selectedRow],
+		[getEffectiveValue],
 	);
 
 	// Handle JSON editor save - memoized
@@ -805,22 +481,25 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					<div ref={sidebarRef} className="flex-1 overflow-auto p-4">
 						<div className="space-y-3">
 							{filteredColumns.map((column) => {
-								const value = selectedRow[column];
+								const value = getEffectiveValue(column);
 								const isNull = isValueNull(column);
 								const canEdit = !isPrimaryKey(column);
 								const truncatedColumnName = truncateColumnName(column);
 								const inputType = getInputType(column);
 								const columnType = getColumnType(column);
+								
+								// Check if has pending change
+								const hasPendingChange = selectedRowKey && pendingChanges[selectedRowKey]?.changes[column];
 
 								return (
 									<div
 										key={column}
-									className="space-y-1 pb-2 border-b border-border/50 mb-2"
+									className={`space-y-1 pb-2 border-b border-border/50 mb-2 ${hasPendingChange ? "bg-blue-50/30 -mx-2 px-2 rounded" : ""}`}
 									>
 										<div className="flex justify-between items-center">
 											<label
 												htmlFor={`field-${column}`}
-											className="text-xs font-medium text-foreground"
+											className={`text-xs font-medium ${hasPendingChange ? "text-blue-700 dark:text-blue-400" : "text-foreground"}`}
 												title={column} // Show full column name on hover
 											>
 												{truncatedColumnName}
@@ -859,10 +538,9 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 													height="100%"
 													language="json"
 													value={
-														column in editedValues &&
-														editedValues[column] !== null
-															? (editedValues[column] as string)
-															: formatValue(value)
+														// Value is already resolved by getEffectiveValue
+														// Just need to format it if object
+														typeof value === 'string' ? value : formatValue(value)
 													}
 													onChange={(value) =>
 														handleMonacoChange(column, value)
@@ -887,10 +565,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 													type={inputType}
 													readOnly={!canEdit}
 													value={
-														column in editedValues &&
-														editedValues[column] !== null
-															? (editedValues[column] as string)
-															: formatDateForInput(value, inputType)
+														formatDateForInput(value, inputType)
 													}
 													onChange={
 														canEdit
@@ -900,10 +575,10 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm
 													${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
-													${!isValidDate(value) && !(column in editedValues) ? "border-amber-400 bg-amber-50/60" : ""}
+													${!isValidDate(value) ? "border-amber-400 bg-amber-50/60" : ""}
 												`}
 												/>
-												{!isValidDate(value) && !(column in editedValues) && (
+												{!isValidDate(value) && (
 													<div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
 														Invalid date format. Edit to fix.
 													</div>
@@ -915,10 +590,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 												type="number"
 												readOnly={!canEdit}
 												value={
-													column in editedValues &&
-													editedValues[column] !== null
-														? (editedValues[column] as string)
-														: formatValue(value)
+													value === null ? "" : String(value)
 												}
 												onChange={
 													canEdit
@@ -935,10 +607,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 												type="text"
 												readOnly={!canEdit}
 												value={
-													column in editedValues &&
-													editedValues[column] !== null
-														? (editedValues[column] as string)
-														: formatValue(value)
+													value === null ? "" : String(value)
 												}
 												onChange={
 													canEdit
@@ -955,89 +624,10 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 							})}
 						</div>
 					</div>
-
-					{/* Sticky save button at the bottom */}
-					{primaryKeys.length > 0 && (
-						<div className="sticky bottom-0 z-10 p-3 bg-panel border-t border-border/60 flex justify-center">
-							<Button
-								variant="default"
-								className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
-								onClick={handleSaveClick}
-								disabled={!hasChanges() || loading}
-							>
-								<FiSave className="mr-2" size={16} />
-								{loading ? "Saving..." : "Save Changes"}
-							</Button>
-						</div>
-					)}
 				</>
 			)}
-			{/* Confirmation Dialog */}
-			<Dialog
-				open={showConfirmModal}
-				onOpenChange={(open) => {
-					setShowConfirmModal(open);
-					if (!open) {
-						setError(null); // Clear error when dialog is closed
-					}
-				}}
-			>
-				<DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-					<DialogHeader>
-						<DialogTitle className="bg-gray-50 dark:bg-gray-800 -mx-6 -mt-4 px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
-							{error ? "Error" : "Confirm Changes"}
-						</DialogTitle>
-					</DialogHeader>
-
-					<div className="py-4">
-						{error ? (
-							<div className="p-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm">
-								{error}
-							</div>
-						) : (
-							<>
-								<h3 className="text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
-									The following fields will be updated:
-								</h3>
-
-								<div className="max-h-[300px] overflow-y-auto">
-									{hasChanges() ? (
-										renderChanges()
-									) : (
-										<p className="text-gray-500 dark:text-gray-400 text-center py-4">
-											No changes detected
-										</p>
-									)}
-								</div>
-							</>
-						)}
-					</div>
-
-					<DialogFooter className="bg-gray-50 dark:bg-gray-800 px-6 py-4 -mx-6 -mb-6 border-t border-gray-200 dark:border-gray-700">
-						<Button
-							variant="outline"
-							onClick={() => {
-								setShowConfirmModal(false);
-								setError(null); // Clear error when dialog is closed
-							}}
-							disabled={loading}
-							className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-						>
-							{error ? "Close" : "Cancel"}
-						</Button>
-						{!error && (
-							<Button
-								onClick={saveChanges}
-								disabled={!hasChanges() || loading}
-								className={`bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white ${loading ? "opacity-80" : ""}`}
-							>
-								{loading ? "Saving..." : "Save Changes"}
-							</Button>
-						)}
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
+			{/* Confirmation Dialog Removed - Handled Globally */}
+			
 			{/* Copy Row Modal */}
 			{activeTable && (
 				<CopyRowModal
@@ -1092,7 +682,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 						<Button variant="outline" onClick={() => setJsonModalOpen(false)}>
 							Cancel
 						</Button>
-						<Button onClick={handleJsonEditorSave}>Save Changes</Button>
+						<Button onClick={handleJsonEditorSave}>Update Value</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>

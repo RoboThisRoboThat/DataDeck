@@ -34,7 +34,15 @@ export interface PaginationState {
     rowsPerPage: number;
 }
 
+export interface PendingChange {
+    value: unknown;
+    originalValue: unknown;
+}
 
+export interface PendingRowChanges {
+    primaryKeyValues: Record<string, unknown>;
+    changes: Record<string, PendingChange>;
+}
 
 export const FILTER_OPERATOR_LABELS = {
     '=': 'Equal to',

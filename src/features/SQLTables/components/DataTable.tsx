@@ -21,11 +21,15 @@ import {
 	FiX,
 	FiChevronLeft,
 	FiChevronRight,
+	FiSave,
 } from "react-icons/fi";
 import type { TableDataRow } from "../types";
 import FilterModal from "./FilterModal";
 import TableRow from "./TableRow";
+import ReviewChangesModal from "./ReviewChangesModal";
+import { getRowKey } from "../utils/rowKey";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import { useError } from "../../../context/ErrorContext";
 import dayjs from "dayjs";
 import {
 	fetchTableData,
@@ -36,6 +40,8 @@ import {
 	fetchPrimaryKeys,
 	fetchTableStructure,
 	setSelectedRow,
+	discardPendingChange,
+	clearPendingChanges,
 } from "../../../store/slices/tablesSlice";
 
 // Create a custom event for filter clicks
@@ -48,6 +54,7 @@ interface DataTableProps {
 
 const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	const dispatch = useAppDispatch();
+	const { showError } = useError();
 	const tableRef = useRef<HTMLDivElement>(null);
 
 	// Get table state from Redux
@@ -65,6 +72,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				primaryKeys: [],
 				editingCell: null,
 				selectedRow: null,
+				pendingChanges: {},
 			},
 	);
 
@@ -79,11 +87,14 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		pagination,
 		primaryKeys,
 		selectedRow,
+		pendingChanges,
 	} = tableState;
 
 	// Filter modal state
 	const [filterModalOpen, setFilterModalOpen] = useState(false);
+	const [reviewModalOpen, setReviewModalOpen] = useState(false);
 	const [filterColumn, setFilterColumn] = useState("");
+	const [saveLoading, setSaveLoading] = useState(false);
 	const filterModalOpenRef = useRef(false); // Add ref to track modal open state
 
 	// Track previous values to detect changes
@@ -115,6 +126,66 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			setFilterColumn(""); // Clear any pre-selected column
 			setFilterModalOpen(true);
 		}
+	};
+
+	// Handle Save All Changes
+	const handleSaveAllChanges = async () => {
+		setSaveLoading(true);
+		
+		try {
+			// Iterate over all pending changes and save them
+			for (const [_rowKey, rowData] of Object.entries(pendingChanges || {})) {
+				const { primaryKeyValues, changes } = rowData;
+				// Assuming single primary key for now or handling composite
+				// The updateCell API likely needs explicit PK col/val
+				// We need to iterate over changes for this row
+				
+				const pkEntries = Object.entries(primaryKeyValues);
+				if (pkEntries.length === 0) continue;
+				const [primaryKeyColumn, primaryKeyValue] = pkEntries[0];
+
+				for (const [column, change] of Object.entries(changes)) {
+					await window.database.updateCell(
+						connectionId,
+						tableName,
+						primaryKeyColumn,
+						primaryKeyValue as string | number,
+						column,
+						change.value
+					);
+				}
+			}
+
+			// Clear changes after successful save
+			dispatch(clearPendingChanges({ tableName }));
+			setReviewModalOpen(false);
+
+			// Refetch data
+			dispatch(
+				fetchTableData({
+					tableName,
+					connectionId,
+					filters,
+					sortConfig,
+					pagination,
+				}),
+			);
+		} catch (err) {
+			console.error("Failed to save changes:", err);
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			showError({
+				title: "Failed to Save Changes",
+				message: `Could not save your changes to the database. Please check your connection and try again.`,
+				details: errorMessage,
+			});
+		} finally {
+			setSaveLoading(false);
+		}
+	};
+
+	// Handle discard change
+	const handleDiscardChange = (rowKey: string, column?: string) => {
+		dispatch(discardPendingChange({ tableName, rowKey, column }));
 	};
 
 	// Set active table when component mounts
@@ -627,6 +698,21 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 					</div>
 
 					<div className="flex items-center space-x-6">
+						{/* Review Changes Button */}
+						{pendingChanges && Object.keys(pendingChanges).length > 0 && (
+							<div className="flex items-center">
+								<Button
+									variant="default"
+									size="sm"
+									className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+									onClick={() => setReviewModalOpen(true)}
+								>
+									<FiSave size={14} />
+									<span>Review {Object.values(pendingChanges).reduce((acc, row) => acc + Object.keys(row.changes).length, 0)} Changes</span>
+								</Button>
+							</div>
+						)}
+
 						{/* Filter button */}
 						<div className="flex items-center">
 							<Button
@@ -743,19 +829,27 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						renderLoadingState()
 					) : hasData ? (
 						<div style={{ height: "calc(100% - 50px)" }}>
-							{data.map((row, index) => (
-								<TableRow
-									key={`row-${index}`}
-									row={row}
-									rowIndex={index}
-									columns={columns}
-									primaryKeys={primaryKeys}
-									isSelected={isRowSelected(row)}
-									columnWidths={columnWidths}
-									onRowSelect={handleRowSelect}
-									onCopyCellContent={handleCopyCellContent}
-								/>
-							))}
+							{data.map((row, index) => {
+								const rowKey = getRowKey(row, primaryKeys);
+								const rowChanges = pendingChanges?.[rowKey] || null;
+								
+								return (
+									<TableRow
+										key={`row-${index}`}
+										row={row}
+										rowIndex={index}
+										columns={columns}
+										primaryKeys={primaryKeys}
+										isSelected={isRowSelected(row)}
+										columnWidths={columnWidths}
+										onRowSelect={handleRowSelect}
+										onCopyCellContent={handleCopyCellContent}
+										pendingChanges={rowChanges}
+										rowKey={rowKey}
+										tableName={tableName}
+									/>
+								);
+							})}
 						</div>
 					) : (
 						renderEmptyState()
@@ -771,6 +865,16 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 				selectedColumn={filterColumn}
 				currentFilter={filters[filterColumn]}
 				onApply={handleFilterApply}
+			/>
+
+			{/* Review Changes Modal */}
+			<ReviewChangesModal
+				open={reviewModalOpen}
+				onClose={() => setReviewModalOpen(false)}
+				changes={pendingChanges || {}}
+				onSave={handleSaveAllChanges}
+				onDiscard={handleDiscardChange}
+				loading={saveLoading}
 			/>
 		</div>
 	);

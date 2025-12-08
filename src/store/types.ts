@@ -3,6 +3,7 @@ import type {
 	SortConfig,
 	FilterCondition,
 	PaginationState,
+	PendingRowChanges,
 } from "../features/SQLTables/types";
 
 // Column structure interface
@@ -31,6 +32,7 @@ export interface TableState {
 		primaryKeyValue: string | number;
 	} | null;
 	selectedRow: TableDataRow | null;
+	pendingChanges: Record<string, PendingRowChanges>;
 }
 
 // Root state interface for tables

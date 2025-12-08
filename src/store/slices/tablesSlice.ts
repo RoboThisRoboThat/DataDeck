@@ -31,6 +31,7 @@ const defaultTableState: TableState = {
 	structure: [],
 	editingCell: null,
 	selectedRow: null,
+	pendingChanges: {},
 };
 
 // Helper function to build SQL filter condition
@@ -355,6 +356,93 @@ const tablesSlice = createSlice({
 
 			state.tables[tableName].selectedRow = selectedRow;
 		},
+
+		setPendingChange: (
+			state,
+			action: PayloadAction<{
+				tableName: string;
+				rowKey: string;
+				primaryKeyValues: Record<string, unknown>;
+				column: string;
+				value: unknown;
+				originalValue: unknown;
+			}>,
+		) => {
+			const {
+				tableName,
+				rowKey,
+				primaryKeyValues,
+				column,
+				value,
+				originalValue,
+			} = action.payload;
+			if (!state.tables[tableName]) {
+				state.tables[tableName] = { ...defaultTableState };
+			}
+			if (!state.tables[tableName].pendingChanges) {
+				state.tables[tableName].pendingChanges = {};
+			}
+			if (!state.tables[tableName].pendingChanges[rowKey]) {
+				state.tables[tableName].pendingChanges[rowKey] = {
+					primaryKeyValues,
+					changes: {},
+				};
+			}
+			// If value equals original value, remove the change
+			// Note: This is a simple equality check. For complex types, might need more.
+			// But since we store originalValue, we can trust the caller to provide the right original.
+			if (value === originalValue) {
+				delete state.tables[tableName].pendingChanges[rowKey].changes[column];
+				if (
+					Object.keys(state.tables[tableName].pendingChanges[rowKey].changes)
+						.length === 0
+				) {
+					delete state.tables[tableName].pendingChanges[rowKey];
+				}
+			} else {
+				state.tables[tableName].pendingChanges[rowKey].changes[column] = {
+					value,
+					originalValue,
+				};
+			}
+		},
+
+		discardPendingChange: (
+			state,
+			action: PayloadAction<{
+				tableName: string;
+				rowKey: string;
+				column?: string;
+			}>,
+		) => {
+			const { tableName, rowKey, column } = action.payload;
+			if (
+				!state.tables[tableName] ||
+				!state.tables[tableName].pendingChanges ||
+				!state.tables[tableName].pendingChanges[rowKey]
+			) {
+				return;
+			}
+
+			if (column) {
+				delete state.tables[tableName].pendingChanges[rowKey].changes[column];
+				if (
+					Object.keys(state.tables[tableName].pendingChanges[rowKey].changes)
+						.length === 0
+				) {
+					delete state.tables[tableName].pendingChanges[rowKey];
+				}
+			} else {
+				delete state.tables[tableName].pendingChanges[rowKey];
+			}
+		},
+
+		clearPendingChanges: (state, action: PayloadAction<{ tableName: string }>) => {
+			const { tableName } = action.payload;
+			if (state.tables[tableName]) {
+				state.tables[tableName].pendingChanges = {};
+			}
+		},
 	},
 	extraReducers: (builder) => {
 		builder
@@ -458,6 +546,9 @@ export const {
 	clearTableState,
 	setEditingCell,
 	setSelectedRow,
+	setPendingChange,
+	discardPendingChange,
+	clearPendingChanges,
 } = tablesSlice.actions;
 
 // Export reducer
