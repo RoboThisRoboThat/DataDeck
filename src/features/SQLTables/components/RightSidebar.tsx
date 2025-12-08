@@ -605,7 +605,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			>
 				<DialogContent className="sm:max-w-4xl h-[80vh]">
 					<DialogHeader>
-						<DialogTitle className="bg-gray-50 -mx-6 -mt-4 px-6 py-3 border-b">
+						<DialogTitle
+							className={`-mx-6 -mt-4 px-6 py-3 border-b 
+								${theme === "dark" 
+									? "bg-zinc-900 text-gray-100 border-zinc-800"
+									: "bg-gray-50 text-gray-900 border-gray-200"
+								}
+							`}
+						>
 							Edit JSON {activeJsonColumn && `(${activeJsonColumn})`}
 						</DialogTitle>
 					</DialogHeader>
@@ -630,7 +637,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 						</div>
 					</div>
 
-					<DialogFooter className="bg-gray-50 px-6 py-4 -mx-6 -mb-6 border-t">
+					<DialogFooter
+						className={`px-6 py-4 -mx-6 -mb-6 border-t
+							${theme === "dark"
+								? "bg-zinc-900 border-zinc-800"
+								: "bg-gray-50 border-gray-200"
+							}
+						`}
+					>
 						<Button variant="outline" onClick={() => setJsonModalOpen(false)}>
 							Cancel
 						</Button>
