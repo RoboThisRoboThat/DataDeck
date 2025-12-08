@@ -692,10 +692,9 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	};
 
 	return (
-		<div
-			className="w-72 min-w-72 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-auto h-full"
-		>
-			<div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+		<div className="w-72 min-w-72 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">
+			{/* Sticky header with search bar */}
+			<div className="sticky top-0 z-10 p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
 				<div className="flex justify-between items-center mb-3">
 					<h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
 						Row Details
@@ -764,195 +763,196 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 				</div>
 			</div>
 
+			{/* Empty states */}
 			{!activeTable && (
-				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 dark:text-gray-400 text-center">
+				<div className="flex flex-col items-center justify-center p-6 flex-1 text-gray-500 dark:text-gray-400 text-center">
 					<FiDatabase className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">Select a table to view row details</p>
 				</div>
 			)}
 
 			{activeTable && !hasSelectedRowData && (
-				<div className="flex flex-col items-center justify-center p-6 h-full text-gray-500 dark:text-gray-400 text-center">
+				<div className="flex flex-col items-center justify-center p-6 flex-1 text-gray-500 dark:text-gray-400 text-center">
 					<FiAlertCircle className="w-8 h-8 mb-3 opacity-50" />
 					<p className="text-sm">
 						Click on a row in the table to view its details
 					</p>
 				</div>
 			)}
-			<div ref={sidebarRef}>
-				{activeTable && hasSelectedRowData && (
-					<>
-						<div className="flex-1 p-4 overflow-auto">
-							<div className="space-y-3">
-								{filteredColumns.map((column) => {
-									const value = selectedRow[column];
-									const isNull = isValueNull(column);
-									const canEdit = !isPrimaryKey(column);
-									const truncatedColumnName = truncateColumnName(column);
-									const inputType = getInputType(column);
-									const columnType = getColumnType(column);
 
-									return (
-										<div
-											key={column}
-											className="space-y-1 pb-2 border-b border-gray-100 dark:border-gray-700 mb-2"
-										>
-											<div className="flex justify-between items-center">
-												<label
-													htmlFor={`field-${column}`}
-													className="text-xs font-medium text-gray-700 dark:text-gray-300"
-													title={column} // Show full column name on hover
-												>
-													{truncatedColumnName}
-													{isPrimaryKey(column) && (
-														<span className="ml-1 text-xs bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded">
-															PK
-														</span>
-													)}
-													<span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 py-0.5 rounded">
-														({columnType || "N/A"})
+			{/* Scrollable input fields section */}
+			{activeTable && hasSelectedRowData && (
+				<>
+					<div ref={sidebarRef} className="flex-1 overflow-auto p-4">
+						<div className="space-y-3">
+							{filteredColumns.map((column) => {
+								const value = selectedRow[column];
+								const isNull = isValueNull(column);
+								const canEdit = !isPrimaryKey(column);
+								const truncatedColumnName = truncateColumnName(column);
+								const inputType = getInputType(column);
+								const columnType = getColumnType(column);
+
+								return (
+									<div
+										key={column}
+										className="space-y-1 pb-2 border-b border-gray-100 dark:border-gray-700 mb-2"
+									>
+										<div className="flex justify-between items-center">
+											<label
+												htmlFor={`field-${column}`}
+												className="text-xs font-medium text-gray-700 dark:text-gray-300"
+												title={column} // Show full column name on hover
+											>
+												{truncatedColumnName}
+												{isPrimaryKey(column) && (
+													<span className="ml-1 text-xs bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded">
+														PK
 													</span>
-												</label>
-												{inputType === "json" && canEdit && (
-													<Button
-														variant="ghost"
-														size="sm"
-														className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-														onClick={() => handleOpenJsonModal(column)}
-														title="Edit in full-screen"
-													>
-														<FiEdit
-															size={14}
-															className="text-blue-500 dark:text-blue-400"
-														/>
-													</Button>
 												)}
-											</div>
-
-											{isNull ? (
-												<div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-400 dark:text-gray-500 italic">
-													NULL
-												</div>
-											) : inputType === "json" ? (
-												<div className="h-36 border border-blue-300 dark:border-blue-600 rounded-md overflow-hidden">
-													<Editor
-														height="100%"
-														language="json"
-														value={
-															column in editedValues &&
-															editedValues[column] !== null
-																? (editedValues[column] as string)
-																: formatValue(value)
-														}
-														onChange={(value) =>
-															handleMonacoChange(column, value)
-														}
-														options={{
-															minimap: { enabled: false },
-															lineNumbers: "on",
-															fontSize: 12,
-															scrollBeyondLastLine: false,
-															automaticLayout: true,
-															wordWrap: "on",
-															readOnly: !canEdit,
-															theme: "vs-dark",
-														}}
+												<span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 py-0.5 rounded">
+													({columnType || "N/A"})
+												</span>
+											</label>
+											{inputType === "json" && canEdit && (
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+													onClick={() => handleOpenJsonModal(column)}
+													title="Edit in full-screen"
+												>
+													<FiEdit
+														size={14}
+														className="text-blue-500 dark:text-blue-400"
 													/>
-												</div>
-											) : inputType === "date" ||
-												inputType === "datetime-local" ? (
-												<div className="relative">
-													<input
-														id={`field-${column}`}
-														type={inputType}
-														readOnly={!canEdit}
-														value={
-															column in editedValues &&
-															editedValues[column] !== null
-																? (editedValues[column] as string)
-																: formatDateForInput(value, inputType)
-														}
-														onChange={
-															canEdit
-																? (e) =>
-																		handleInputChange(column, e.target.value)
-																: undefined
-														}
-														className={`w-full px-3 py-2 border rounded-md text-sm
-														${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
-														${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20" : ""}
-													`}
-													/>
-													{!isValidDate(value) && !(column in editedValues) && (
-														<div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-															Invalid date format. Edit to fix.
-														</div>
-													)}
-												</div>
-											) : inputType === "number" ? (
-												<input
-													id={`field-${column}`}
-													type="number"
-													readOnly={!canEdit}
-													value={
-														column in editedValues &&
-														editedValues[column] !== null
-															? (editedValues[column] as string)
-															: formatValue(value)
-													}
-													onChange={
-														canEdit
-															? (e) => handleInputChange(column, e.target.value)
-															: undefined
-													}
-													className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
-												`}
-												/>
-											) : (
-												<input
-													id={`field-${column}`}
-													type="text"
-													readOnly={!canEdit}
-													value={
-														column in editedValues &&
-														editedValues[column] !== null
-															? (editedValues[column] as string)
-															: formatValue(value)
-													}
-													onChange={
-														canEdit
-															? (e) => handleInputChange(column, e.target.value)
-															: undefined
-													}
-													className={`w-full px-3 py-2 border rounded-md text-sm
-													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
-												`}
-												/>
+												</Button>
 											)}
 										</div>
-									);
-								})}
-							</div>
-						</div>
 
-						{/* Fixed save button at the bottom */}
-						{primaryKeys.length > 0 && (
-							<div className="sticky bottom-0 p-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center">
-								<Button
-									variant="default"
-									className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
-									onClick={handleSaveClick}
-									disabled={!hasChanges() || loading}
-								>
-									<FiSave className="mr-2" size={16} />
-									{loading ? "Saving..." : "Save Changes"}
-								</Button>
-							</div>
-						)}
-					</>
-				)}
-			</div>
+										{isNull ? (
+											<div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-md text-sm text-gray-400 dark:text-gray-500 italic">
+												NULL
+											</div>
+										) : inputType === "json" ? (
+											<div className="h-36 border border-blue-300 dark:border-blue-600 rounded-md overflow-hidden">
+												<Editor
+													height="100%"
+													language="json"
+													value={
+														column in editedValues &&
+														editedValues[column] !== null
+															? (editedValues[column] as string)
+															: formatValue(value)
+													}
+													onChange={(value) =>
+														handleMonacoChange(column, value)
+													}
+													options={{
+														minimap: { enabled: false },
+														lineNumbers: "on",
+														fontSize: 12,
+														scrollBeyondLastLine: false,
+														automaticLayout: true,
+														wordWrap: "on",
+														readOnly: !canEdit,
+														theme: "vs-dark",
+													}}
+												/>
+											</div>
+										) : inputType === "date" ||
+											inputType === "datetime-local" ? (
+											<div className="relative">
+												<input
+													id={`field-${column}`}
+													type={inputType}
+													readOnly={!canEdit}
+													value={
+														column in editedValues &&
+														editedValues[column] !== null
+															? (editedValues[column] as string)
+															: formatDateForInput(value, inputType)
+													}
+													onChange={
+														canEdit
+															? (e) =>
+																	handleInputChange(column, e.target.value)
+															: undefined
+													}
+													className={`w-full px-3 py-2 border rounded-md text-sm
+													${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+													${!isValidDate(value) && !(column in editedValues) ? "border-orange-300 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20" : ""}
+												`}
+												/>
+												{!isValidDate(value) && !(column in editedValues) && (
+													<div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+														Invalid date format. Edit to fix.
+													</div>
+												)}
+											</div>
+										) : inputType === "number" ? (
+											<input
+												id={`field-${column}`}
+												type="number"
+												readOnly={!canEdit}
+												value={
+													column in editedValues &&
+													editedValues[column] !== null
+														? (editedValues[column] as string)
+														: formatValue(value)
+												}
+												onChange={
+													canEdit
+														? (e) => handleInputChange(column, e.target.value)
+														: undefined
+												}
+												className={`w-full px-3 py-2 border rounded-md text-sm
+												${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+											`}
+											/>
+										) : (
+											<input
+												id={`field-${column}`}
+												type="text"
+												readOnly={!canEdit}
+												value={
+													column in editedValues &&
+													editedValues[column] !== null
+														? (editedValues[column] as string)
+														: formatValue(value)
+												}
+												onChange={
+													canEdit
+														? (e) => handleInputChange(column, e.target.value)
+														: undefined
+												}
+												className={`w-full px-3 py-2 border rounded-md text-sm
+												${canEdit ? "border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}
+											`}
+											/>
+										)}
+									</div>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* Sticky save button at the bottom */}
+					{primaryKeys.length > 0 && (
+						<div className="sticky bottom-0 z-10 p-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-center">
+							<Button
+								variant="default"
+								className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
+								onClick={handleSaveClick}
+								disabled={!hasChanges() || loading}
+							>
+								<FiSave className="mr-2" size={16} />
+								{loading ? "Saving..." : "Save Changes"}
+							</Button>
+						</div>
+					)}
+				</>
+			)}
 			{/* Confirmation Dialog */}
 			<Dialog
 				open={showConfirmModal}
