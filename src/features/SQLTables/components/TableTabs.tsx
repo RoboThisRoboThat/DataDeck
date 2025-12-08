@@ -1,8 +1,59 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, memo } from "react";
 import type React from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { IoChevronBack, IoChevronForward, IoClose } from "react-icons/io5";
 import { Button } from "../../../components/ui/button";
+
+interface TableTabItemProps {
+	table: string;
+	isActive: boolean;
+	onSelect: (tableName: string) => void;
+	onClose: (tableName: string, event: React.MouseEvent) => void;
+}
+
+const TableTabItem = memo(function TableTabItem({
+	table,
+	isActive,
+	onSelect,
+	onClose,
+}: TableTabItemProps) {
+	const handleClick = useCallback(() => {
+		onSelect(table);
+	}, [onSelect, table]);
+
+	const handleClose = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onClose(table, e);
+		},
+		[onClose, table],
+	);
+
+	return (
+		<Button
+			variant="ghost"
+			onClick={handleClick}
+			className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm transition-colors mx-[1px]
+				${
+					isActive
+						? "bg-card border border-border/70 rounded-md text-foreground font-semibold shadow-sm z-10"
+						: "text-muted-foreground hover:bg-muted rounded-md"
+				}`}
+		>
+			<span className="max-w-[150px] truncate">{table}</span>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				onClick={handleClose}
+				className="ml-2 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+				aria-label={`Close ${table} tab`}
+			>
+				<IoClose className="w-3 h-3 text-muted-foreground" />
+			</Button>
+		</Button>
+	);
+});
 
 interface TableTabsProps {
 	tables: string[];
@@ -129,36 +180,17 @@ const TableTabs: React.FC<TableTabsProps> = ({
 			{/* Scrollable Tabs Container */}
 			<div
 				ref={tabsRef}
-        className="flex-1 flex overflow-x-auto scrollbar-hide"
+				className="flex-1 flex overflow-x-auto scrollbar-hide"
 				onScroll={checkScrollButtons}
 			>
 				{tables.map((table) => (
-					<Button
+					<TableTabItem
 						key={table}
-						variant="ghost"
-						onClick={() => setActiveTable(table)}
-            className={`group relative flex-none flex items-center px-4 py-2 h-9 text-sm transition-colors mx-[1px]
-              ${
-                activeTable === table
-                  ? "bg-card border border-border/70 rounded-md text-foreground font-semibold shadow-sm z-10"
-                  : "text-muted-foreground hover:bg-muted rounded-md"
-              }`}
-					>
-						<span className="max-w-[150px] truncate">{table}</span>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							onClick={(e: React.MouseEvent) => {
-								e.stopPropagation();
-								handleCloseTable(table, e);
-							}}
-							className="ml-2 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-							aria-label={`Close ${table} tab`}
-						>
-							<IoClose className="w-3 h-3 text-muted-foreground" />
-						</Button>
-					</Button>
+						table={table}
+						isActive={activeTable === table}
+						onSelect={setActiveTable}
+						onClose={handleCloseTable}
+					/>
 				))}
 			</div>
 
@@ -177,4 +209,4 @@ const TableTabs: React.FC<TableTabsProps> = ({
 	);
 };
 
-export default TableTabs;
+export default memo(TableTabs);

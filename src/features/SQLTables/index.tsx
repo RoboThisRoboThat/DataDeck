@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import TableList from "./components/TableList";
 import TableTabs from "./components/TableTabs";
@@ -116,26 +116,45 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 		return `calc(100vw - ${leftSidebarWidth}px - ${rightSidebarWidth}px)`;
 	};
 
-	const handleTableSelect = async (tableName: string) => {
+	// Memoized handler to prevent unnecessary re-renders
+	const handleTableSelect = useCallback((tableName: string) => {
 		// Add the table to the list if it's not already there
-		if (!tables.includes(tableName)) {
-			setTables((prevTables) => [...prevTables, tableName]);
-		}
+		setTables((prevTables) => {
+			if (!prevTables.includes(tableName)) {
+				return [...prevTables, tableName];
+			}
+			return prevTables;
+		});
 		setActiveTable(tableName);
-	};
+	}, []);
 
-	const handleCloseTable = (tableName: string, event: React.MouseEvent) => {
-		event.stopPropagation();
-		setTables((prev) => prev.filter((t) => t !== tableName));
-		if (activeTable === tableName) {
-			const remainingTables = tables.filter((t) => t !== tableName);
-			setActiveTable(
-				remainingTables.length > 0
-					? remainingTables[remainingTables.length - 1]
-					: null,
-			);
-		}
-	};
+	// Memoized handler to prevent unnecessary re-renders
+	const handleCloseTable = useCallback(
+		(tableName: string, event: React.MouseEvent) => {
+			event.stopPropagation();
+			setTables((prev) => {
+				const newTables = prev.filter((t) => t !== tableName);
+				// Update active table if the closed one was active
+				if (activeTable === tableName) {
+					setActiveTable(
+						newTables.length > 0 ? newTables[newTables.length - 1] : null,
+					);
+				}
+				return newTables;
+			});
+		},
+		[activeTable],
+	);
+
+	// Memoized handler for setTableSearch
+	const handleSetTableSearch = useCallback((search: string) => {
+		setTableSearch(search);
+	}, []);
+
+	// Memoized handler for setActiveTable
+	const handleSetActiveTable = useCallback((tableName: string) => {
+		setActiveTable(tableName);
+	}, []);
 
 	return (
 		<div className="flex flex-col h-full w-full">
@@ -170,13 +189,13 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="tables"
-					className="flex mt-0 border-none p-0"
-					
+					className="flex mt-0 border-none p-0 data-[state=inactive]:hidden"
+					forceMount
 				>
 					<div
 						className="flex flex-row"
 						id="main-tables-container"
-						style={{ height: "calc(100vh - 110px)",  }}
+						style={{ height: "calc(100vh - 110px)" }}
 					>
 						{/* Left Sidebar */}
 						<div
@@ -190,7 +209,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 								openTables={tables}
 								activeTable={activeTable}
 								tableSearch={tableSearch}
-								setTableSearch={setTableSearch}
+								setTableSearch={handleSetTableSearch}
 								handleTableSelect={handleTableSelect}
 							/>
 						</div>
@@ -228,7 +247,7 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 							<TableTabs
 								tables={tables}
 								activeTable={activeTable}
-								setActiveTable={setActiveTable}
+								setActiveTable={handleSetActiveTable}
 								handleCloseTable={handleCloseTable}
 							/>
 
@@ -276,7 +295,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="query"
-					className="flex-1 mt-0 border-none p-0 h-full"
+					className="flex-1 mt-0 border-none p-0 h-full data-[state=inactive]:hidden"
+					forceMount
 				>
 					<div id="query-panel-container" className="h-full">
 						<QueryPanel connectionId={connectionId} tables={allTables} />
@@ -285,7 +305,8 @@ function SQLTables({ connectionId }: SQLTablesProps) {
 
 				<TabsContent
 					value="er-diagram"
-					className="flex-1 h-full mt-0 border-none p-0"
+					className="flex-1 h-full mt-0 border-none p-0 data-[state=inactive]:hidden"
+					forceMount
 				>
 					<div id="er-diagram-container" className="h-full">
 						<ERDiagram connectionId={connectionId} />

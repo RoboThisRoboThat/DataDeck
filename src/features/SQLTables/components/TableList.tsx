@@ -1,6 +1,39 @@
 import type React from "react";
-import { forwardRef, useState, useEffect } from "react";
+import { forwardRef, useState, useEffect, useMemo, memo, useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
+
+interface TableListItemProps {
+	table: string;
+	index: number;
+	isOpen: boolean;
+	isActive: boolean;
+	isFocused: boolean;
+	onSelect: (table: string) => void;
+}
+
+const TableListItem = memo(function TableListItem({
+	table,
+	index,
+	isOpen,
+	isActive,
+	isFocused,
+	onSelect,
+}: TableListItemProps) {
+	return (
+		<button
+			key={table}
+			type="button"
+			className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors
+				${isOpen ? "text-primary" : "text-foreground"}
+				${isActive ? "bg-primary/10 text-primary border border-primary/30 shadow-sm" : "hover:bg-muted"}
+				${isFocused ? "ring-2 ring-primary/70 ring-offset-1 ring-offset-background" : ""}
+				focus:outline-none focus:ring-2 focus:ring-primary/70`}
+			onClick={() => onSelect(table)}
+		>
+			{table}
+		</button>
+	);
+});
 
 interface TableListProps {
 	tables: string[];
@@ -25,15 +58,17 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 	) => {
 		const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
-		// Filter tables based on search
-		const getFilteredTables = () => {
+		// Memoize filtered tables to prevent recalculation on every render
+		const filteredTables = useMemo(() => {
 			if (!tableSearch.trim()) return tables;
+			const searchLower = tableSearch.toLowerCase();
 			return tables.filter((table) =>
-				table.toLowerCase().includes(tableSearch.toLowerCase()),
+				table.toLowerCase().includes(searchLower),
 			);
-		};
+		}, [tables, tableSearch]);
 
-		const filteredTables = getFilteredTables();
+		// Memoize open tables set for O(1) lookup
+		const openTablesSet = useMemo(() => new Set(openTables), [openTables]);
 
 		// Reset focus index when search changes or filtered list becomes empty
 		useEffect(() => {
@@ -76,27 +111,42 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 			{ enableOnFormTags: true },
 		);
 
+		// Memoized callback for handling table selection
+		const onTableSelect = useCallback(
+			(table: string) => {
+				handleTableSelect(table);
+			},
+			[handleTableSelect],
+		);
+
 		// We'll keep this for direct keyboard navigation when the input is focused
-		const handleInputKeyDown = (
-			event: React.KeyboardEvent<HTMLInputElement>,
-		) => {
-			// Only handle basic navigation keys here, not the alt+arrow combinations
-			if (
-				event.key === "Enter" &&
-				focusedIndex >= 0 &&
-				filteredTables.length > 0
-			) {
-				event.preventDefault();
-				handleTableSelect(filteredTables[focusedIndex]);
-			}
-		};
+		const handleInputKeyDown = useCallback(
+			(event: React.KeyboardEvent<HTMLInputElement>) => {
+				// Only handle basic navigation keys here, not the alt+arrow combinations
+				if (
+					event.key === "Enter" &&
+					focusedIndex >= 0 &&
+					filteredTables.length > 0
+				) {
+					event.preventDefault();
+					handleTableSelect(filteredTables[focusedIndex]);
+				}
+			},
+			[focusedIndex, filteredTables, handleTableSelect],
+		);
+
+		// Memoized search change handler
+		const handleSearchChange = useCallback(
+			(e: React.ChangeEvent<HTMLInputElement>) => {
+				setTableSearch(e.target.value);
+			},
+			[setTableSearch],
+		);
 
 		return (
-      <div
-        className="w-64 min-w-64 bg-panel border-r border-border/60 flex flex-col h-full"
-      >
-        <div className="p-4 border-b border-border/60 bg-panel">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.18em] mb-3">
+			<div className="w-64 min-w-64 bg-panel border-r border-border/60 flex flex-col h-full">
+				<div className="p-4 border-b border-border/60 bg-panel">
+					<h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.18em] mb-3">
 						Tables
 					</h2>
 
@@ -107,10 +157,10 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 								ref={ref}
 								type="text"
 								value={tableSearch}
-								onChange={(e) => setTableSearch(e.target.value)}
+								onChange={handleSearchChange}
 								onKeyDown={handleInputKeyDown}
 								placeholder="Search tables..."
-                className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm placeholder:text-muted-foreground/70 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-transparent shadow-sm"
+								className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm placeholder:text-muted-foreground/70 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-transparent shadow-sm"
 							/>
 						</div>
 					</div>
@@ -120,26 +170,23 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 				<div className="overflow-y-auto p-4 pt-2 flex-1">
 					<div className="space-y-0.5">
 						{filteredTables.map((table, index) => (
-							<button
+							<TableListItem
 								key={table}
-								type="button"
-                className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors
-                ${openTables.includes(table) ? "text-primary" : "text-foreground"}
-                ${activeTable === table ? "bg-primary/10 text-primary border border-primary/30 shadow-sm" : "hover:bg-muted"}
-                ${index === focusedIndex ? "ring-2 ring-primary/70 ring-offset-1 ring-offset-background" : ""}
-                focus:outline-none focus:ring-2 focus:ring-primary/70`}
-								onClick={() => handleTableSelect(table)}
-							>
-								{table}
-							</button>
+								table={table}
+								index={index}
+								isOpen={openTablesSet.has(table)}
+								isActive={activeTable === table}
+								isFocused={index === focusedIndex}
+								onSelect={onTableSelect}
+							/>
 						))}
 
 						{/* No Results Message */}
-            {filteredTables.length === 0 && (
-              <div className="text-center py-4 text-muted-foreground text-sm">
-                No tables found matching "{tableSearch}"
-              </div>
-            )}
+						{filteredTables.length === 0 && (
+							<div className="text-center py-4 text-muted-foreground text-sm">
+								No tables found matching "{tableSearch}"
+							</div>
+						)}
 					</div>
 				</div>
 			</div>
@@ -147,4 +194,4 @@ const TableList = forwardRef<HTMLInputElement, TableListProps>(
 	},
 );
 
-export default TableList;
+export default memo(TableList);

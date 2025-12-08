@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
@@ -45,15 +45,27 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	// Get the active table name from Redux
 	const activeTable = useAppSelector((state) => state.tables.activeTable);
 
-	// Get the selected row data and columns for the active table
+	// Use granular selectors to only re-render when specific data changes
+	const selectedRow = useAppSelector((state) =>
+		activeTable ? state.tables.tables[activeTable]?.selectedRow ?? null : null,
+	);
+
+	const columns = useAppSelector((state) =>
+		activeTable ? state.tables.tables[activeTable]?.columns ?? [] : [],
+	);
+
+	const primaryKeys = useAppSelector((state) =>
+		activeTable ? state.tables.tables[activeTable]?.primaryKeys ?? [] : [],
+	);
+
+	const structure = useAppSelector((state) =>
+		activeTable ? state.tables.tables[activeTable]?.structure ?? [] : [],
+	);
+
+	// Get filters, sortConfig, pagination only when needed for saving
 	const tableState = useAppSelector((state) =>
 		activeTable ? state.tables.tables[activeTable] : null,
 	);
-
-	const selectedRow = tableState?.selectedRow || null;
-	const columns = tableState?.columns || [];
-	const primaryKeys = tableState?.primaryKeys || [];
-	const structure = tableState?.structure || [];
 	// State for editing mode - always in edit mode
 	const [editedValues, setEditedValues] = useState<Record<string, unknown>>({});
 	const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -68,10 +80,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	// TODO: Use this when implementing custom editor features
 	// const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
 
-	// Filter columns based on search query
-	const filteredColumns = columns.filter((column) =>
-		column.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
+	// Memoize filtered columns to prevent recalculation on every render
+	const filteredColumns = useMemo(() => {
+		if (!searchQuery.trim()) return columns;
+		const searchLower = searchQuery.toLowerCase();
+		return columns.filter((column) =>
+			column.toLowerCase().includes(searchLower),
+		);
+	}, [columns, searchQuery]);
 
 	// Reset edited values when selected row changes
 	useEffect(() => {
@@ -105,23 +121,23 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	// Determine if we have selected row data to display
 	const hasSelectedRowData = !!selectedRow;
 
-	// Handle input change
-	const handleInputChange = (column: string, value: string) => {
+	// Handle input change - memoized
+	const handleInputChange = useCallback((column: string, value: string) => {
 		setEditedValues((prev) => ({
 			...prev,
 			[column]: value,
 		}));
-	};
+	}, []);
 
-	// Handle Monaco editor change
-	const handleMonacoChange = (column: string, value: string | undefined) => {
+	// Handle Monaco editor change - memoized
+	const handleMonacoChange = useCallback((column: string, value: string | undefined) => {
 		if (value !== undefined) {
 			setEditedValues((prev) => ({
 				...prev,
 				[column]: value,
 			}));
 		}
-	};
+	}, []);
 
 	// Handle save button click
 	const handleSaveClick = () => {
@@ -671,25 +687,28 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		},
 	);
 
-	// Open JSON editor modal
-	const handleOpenJsonModal = (column: string) => {
-		const value =
-			column in editedValues && editedValues[column] !== null
-				? (editedValues[column] as string)
-				: formatValue(selectedRow?.[column]);
+	// Open JSON editor modal - memoized
+	const handleOpenJsonModal = useCallback(
+		(column: string) => {
+			const value =
+				column in editedValues && editedValues[column] !== null
+					? (editedValues[column] as string)
+					: formatValue(selectedRow?.[column]);
 
-		setJsonEditorValue(value);
-		setActiveJsonColumn(column);
-		setJsonModalOpen(true);
-	};
+			setJsonEditorValue(value);
+			setActiveJsonColumn(column);
+			setJsonModalOpen(true);
+		},
+		[editedValues, selectedRow],
+	);
 
-	// Handle JSON editor save
-	const handleJsonEditorSave = () => {
+	// Handle JSON editor save - memoized
+	const handleJsonEditorSave = useCallback(() => {
 		if (activeJsonColumn) {
 			handleMonacoChange(activeJsonColumn, jsonEditorValue);
 			setJsonModalOpen(false);
 		}
-	};
+	}, [activeJsonColumn, jsonEditorValue, handleMonacoChange]);
 
 	return (
 		<div className="w-72 min-w-72 bg-panel border-l border-border/60 flex flex-col h-full">
@@ -1081,4 +1100,4 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	);
 }
 
-export default RightSidebar;
+export default memo(RightSidebar);

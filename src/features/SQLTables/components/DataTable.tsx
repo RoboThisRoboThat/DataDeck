@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,8 +23,8 @@ import {
 	FiChevronRight,
 } from "react-icons/fi";
 import type { TableDataRow } from "../types";
-import JsonCell from "./JsonCell";
 import FilterModal from "./FilterModal";
+import TableRow from "./TableRow";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import dayjs from "dayjs";
 import {
@@ -279,8 +279,8 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		setFilterModalOpen(true);
 	};
 
-	// Copy cell content to clipboard
-	const handleCopyCellContent = (value: unknown) => {
+	// Copy cell content to clipboard - memoized to prevent unnecessary re-renders
+	const handleCopyCellContent = useCallback((value: unknown) => {
 		const textToCopy = formatCellValue(value);
 		navigator.clipboard
 			.writeText(textToCopy)
@@ -291,7 +291,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 			.catch((err) => {
 				console.error("Failed to copy text: ", err);
 			});
-	};
+	}, []);
 
 	// Format cell value for display
 	const formatCellValue = (value: unknown): string => {
@@ -382,15 +382,18 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		return `${getColumnWidth(column)}px`;
 	};
 
-	// Handle row selection
-	const handleRowSelect = (row: TableDataRow) => {
-		dispatch(
-			setSelectedRow({
-				tableName,
-				selectedRow: row,
-			}),
-		);
-	};
+	// Handle row selection - memoized to prevent unnecessary re-renders
+	const handleRowSelect = useCallback(
+		(row: TableDataRow) => {
+			dispatch(
+				setSelectedRow({
+					tableName,
+					selectedRow: row,
+				}),
+			);
+		},
+		[dispatch, tableName],
+	);
 
 	// Render the table header
 	const renderTableHeader = () => (
@@ -504,99 +507,21 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		</div>
 	);
 
-	// Render a table row
-	const renderTableRow = (row: TableDataRow, rowIndex: number) => {
-		// Check if this row is selected by comparing primary keys
-		const isSelected =
-			selectedRow && primaryKeys.length > 0
-				? primaryKeys.some((key) => selectedRow[key] === row[key])
-				: false;
+	// Compute selected row key for efficient comparison
+	const selectedRowKey = useMemo(() => {
+		if (!selectedRow || primaryKeys.length === 0) return null;
+		return primaryKeys.map((key) => selectedRow[key]).join("-");
+	}, [selectedRow, primaryKeys]);
 
-		return (
-			<div
-				key={`row-${rowIndex}`}
-				className={`flex w-fit border-b border-border/60 transition-colors ${
-					isSelected
-						? "bg-primary/10 ring-1 ring-primary/30"
-						: rowIndex % 2 === 0
-							? "bg-card"
-							: "bg-muted/60"
-				}`}
-				onClick={() => handleRowSelect(row)}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						handleRowSelect(row);
-					}
-				}}
-				aria-selected={isSelected}
-				style={{ cursor: "pointer" }}
-			>
-				{columns.map((column) => {
-					const cellValue = row[column];
-					const isJson =
-						typeof cellValue === "object" &&
-						cellValue !== null &&
-						!(cellValue instanceof Date);
-
-					const isPrimaryKey = primaryKeys.includes(column);
-					const width = getCellWidth(column);
-
-					// Special styling based on value type
-					const isNull = cellValue === null || cellValue === undefined;
-
-					return (
-						<div
-							key={`cell-${rowIndex}-${column}`}
-							className="overflow-hidden relative transition-colors duration-150"
-							style={{
-								width,
-								minWidth: width,
-								maxWidth: width,
-								borderRight: "1px solid var(--border)",
-							}}
-						>
-							<div
-								className={`px-3 py-2.5 ${isPrimaryKey ? "font-medium" : ""}`}
-							>
-								{isJson ? (
-									<JsonCell value={cellValue} />
-								) : (
-									<TooltipProvider>
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<Button
-													variant="ghost"
-													className={`p-0 h-auto w-full justify-start font-normal truncate text-left hover:bg-transparent ${
-														isNull
-															? "text-muted-foreground italic"
-															: isPrimaryKey
-																? "font-medium"
-																: ""
-													}`}
-													onClick={() => handleCopyCellContent(cellValue)}
-													aria-label={`Copy value: ${formatCellValue(cellValue)}`}
-												>
-													{isNull ? (
-														<span className="text-gray-400">NULL</span>
-													) : (
-														formatCellValue(cellValue)
-													)}
-												</Button>
-											</TooltipTrigger>
-											<TooltipContent>
-												<p>Click to copy</p>
-											</TooltipContent>
-										</Tooltip>
-									</TooltipProvider>
-								)}
-							</div>
-						</div>
-					);
-				})}
-			</div>
-		);
-	};
+	// Check if a row is selected
+	const isRowSelected = useCallback(
+		(row: TableDataRow) => {
+			if (!selectedRowKey || primaryKeys.length === 0) return false;
+			const rowKey = primaryKeys.map((key) => row[key]).join("-");
+			return rowKey === selectedRowKey;
+		},
+		[selectedRowKey, primaryKeys],
+	);
 
 	// Render empty state
 	const renderEmptyState = () => (
@@ -818,7 +743,19 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						renderLoadingState()
 					) : hasData ? (
 						<div style={{ height: "calc(100% - 50px)" }}>
-							{data.map((row, index) => renderTableRow(row, index))}
+							{data.map((row, index) => (
+								<TableRow
+									key={`row-${index}`}
+									row={row}
+									rowIndex={index}
+									columns={columns}
+									primaryKeys={primaryKeys}
+									isSelected={isRowSelected(row)}
+									columnWidths={columnWidths}
+									onRowSelect={handleRowSelect}
+									onCopyCellContent={handleCopyCellContent}
+								/>
+							))}
 						</div>
 					) : (
 						renderEmptyState()
@@ -842,4 +779,4 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 // Export the filter click event name for external use
 export { FILTER_CLICK_EVENT };
 
-export default DataTable;
+export default memo(DataTable);
