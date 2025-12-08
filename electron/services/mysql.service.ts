@@ -282,12 +282,14 @@ class MySQLService {
 		}
 
 		try {
-			// Get columns with their data types
+			// Get columns with their data types and defaults
 			const [columns] = await this.connection.execute(
 				`
                 SELECT 
                     COLUMN_NAME, 
-                    DATA_TYPE
+                    DATA_TYPE,
+                    COLUMN_TYPE,
+                    COLUMN_DEFAULT
                 FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE() 
                 AND TABLE_NAME = ?
@@ -297,12 +299,32 @@ class MySQLService {
 			);
 
 			// Map MySQL data types to the simplified types required
-			return (columns as Array<{ COLUMN_NAME: string; DATA_TYPE: string }>).map(
-				(col) => ({
+			return (
+				columns as Array<{
+					COLUMN_NAME: string;
+					DATA_TYPE: string;
+					COLUMN_TYPE: string;
+					COLUMN_DEFAULT: unknown;
+				}>
+			).map((col) => {
+				const type = col.DATA_TYPE.toLowerCase();
+				let enumValues: string[] | undefined;
+
+				if (type === "enum" || type === "set") {
+					// Parse enum values from COLUMN_TYPE like "enum('a','b')"
+					const matches = col.COLUMN_TYPE.match(/'([^']+)'/g);
+					if (matches) {
+						enumValues = matches.map((m) => m.replace(/'/g, ""));
+					}
+				}
+
+				return {
 					column: col.COLUMN_NAME,
-					type: col.DATA_TYPE.toLowerCase(),
-				}),
-			);
+					type: type,
+					enumValues,
+					defaultValue: col.COLUMN_DEFAULT,
+				};
+			});
 		} catch (error) {
 			console.error("Error getting MySQL table structure:", error);
 			throw error;

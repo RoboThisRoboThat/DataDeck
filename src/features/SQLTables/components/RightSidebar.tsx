@@ -8,6 +8,9 @@ import {
 	FiCopy,
 	FiMoreVertical,
 	FiEdit,
+	FiTrash2,
+	FiRotateCcw,
+	FiRefreshCcw,
 } from "react-icons/fi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,19 +26,28 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
+	DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-	setPendingChange,
-} from "../../../store/slices/tablesSlice";
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { setPendingChange } from "../../../store/slices/tablesSlice";
 import Editor from "@monaco-editor/react";
 import CopyRowModal from "./CopyRowModal";
 import { getRowKey } from "../utils/rowKey";
+import { useTheme } from "@/context/ThemeContext";
 
 interface RightSidebarProps {
 	connectionId: string;
 }
 
 function RightSidebar({ connectionId }: RightSidebarProps) {
+	const {theme} = useTheme();
+	const monacoTheme = theme === "dark" ? "vs-dark" : "vs";
 	const dispatch = useAppDispatch();
 	const sidebarRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -59,15 +71,19 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	const structure = useAppSelector((state) =>
 		activeTable ? state.tables.tables[activeTable]?.structure ?? [] : [],
 	);
-	
-	const pendingChanges = useAppSelector((state) => 
-		activeTable ? state.tables.tables[activeTable]?.pendingChanges || {} : {}
+
+	const pendingChanges = useAppSelector((state) =>
+		activeTable ? state.tables.tables[activeTable]?.pendingChanges || {} : {},
 	);
 
 	// Derived state
-	const selectedRowKey = useMemo(() => 
-		selectedRow && primaryKeys.length > 0 ? getRowKey(selectedRow, primaryKeys) : null
-	, [selectedRow, primaryKeys]);
+	const selectedRowKey = useMemo(
+		() =>
+			selectedRow && primaryKeys.length > 0
+				? getRowKey(selectedRow, primaryKeys)
+				: null,
+		[selectedRow, primaryKeys],
+	);
 
 	// State for UI
 	const [searchQuery, setSearchQuery] = useState("");
@@ -103,46 +119,50 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	const hasSelectedRowData = !!selectedRow;
 
 	// Helper to get effective value (pending or original)
-	const getEffectiveValue = useCallback((column: string) => {
-		if (!selectedRowKey || !pendingChanges[selectedRowKey]) {
-			return selectedRow?.[column];
-		}
-		const change = pendingChanges[selectedRowKey].changes[column];
-		return change ? change.value : selectedRow?.[column];
-	}, [selectedRow, selectedRowKey, pendingChanges]);
+	const getEffectiveValue = useCallback(
+		(column: string) => {
+			if (!selectedRowKey || !pendingChanges[selectedRowKey]) {
+				return selectedRow?.[column];
+			}
+			const change = pendingChanges[selectedRowKey].changes[column];
+			return change ? change.value : selectedRow?.[column];
+		},
+		[selectedRow, selectedRowKey, pendingChanges],
+	);
 
 	// Handle input change - now updates global pending state
-	const handleInputChange = useCallback((column: string, value: string) => {
-		if (!activeTable || !selectedRowKey || !selectedRow) return;
+	const handleInputChange = useCallback(
+		(column: string, value: unknown) => {
+			if (!activeTable || !selectedRowKey || !selectedRow) return;
 
-		// Simple type inference or keep as string (same as TableRow logic)
-		// Ideally we should use column type from structure to parse correctly
-		let parsedValue: unknown = value;
-		
-		// Logic to respect empty string vs null if needed, 
-		// but sticking to string for input is safer for now.
+			const primaryKeyValues: Record<string, unknown> = {};
+			primaryKeys.forEach((pk) => {
+				primaryKeyValues[pk] = selectedRow[pk];
+			});
 
-		const primaryKeyValues: Record<string, unknown> = {};
-		primaryKeys.forEach(pk => {
-			primaryKeyValues[pk] = selectedRow[pk];
-		});
-
-		dispatch(setPendingChange({
-			tableName: activeTable,
-			rowKey: selectedRowKey,
-			primaryKeyValues,
-			column,
-			value: parsedValue,
-			originalValue: selectedRow[column]
-		}));
-	}, [activeTable, selectedRow, selectedRowKey, primaryKeys, dispatch]);
+			dispatch(
+				setPendingChange({
+					tableName: activeTable,
+					rowKey: selectedRowKey,
+					primaryKeyValues,
+					column,
+					value: value,
+					originalValue: selectedRow[column],
+				}),
+			);
+		},
+		[activeTable, selectedRow, selectedRowKey, primaryKeys, dispatch],
+	);
 
 	// Handle Monaco editor change
-	const handleMonacoChange = useCallback((column: string, value: string | undefined) => {
-		if (value !== undefined) {
-			handleInputChange(column, value);
-		}
-	}, [handleInputChange]);
+	const handleMonacoChange = useCallback(
+		(column: string, value: string | undefined) => {
+			if (value !== undefined) {
+				handleInputChange(column, value);
+			}
+		},
+		[handleInputChange],
+	);
 
 	// Check if a column is a primary key
 	const isPrimaryKey = (column: string): boolean => {
@@ -154,10 +174,25 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		const columnStructure = structure.find((col) => col.column === column);
 		return columnStructure?.type || "";
 	};
+	
+	const getColumnEnumValues = (column: string): string[] | undefined => {
+		const columnStructure = structure.find((col) => col.column === column);
+		return columnStructure?.enumValues;
+	};
+
+	const getColumnDefaultValue = (column: string): unknown => {
+		const columnStructure = structure.find((col) => col.column === column);
+		return columnStructure?.defaultValue;
+	};
 
 	// Determine input type based on column type
 	const getInputType = (column: string): string => {
 		const columnType = getColumnType(column).toLowerCase();
+		const enumValues = getColumnEnumValues(column);
+
+		if (enumValues && enumValues.length > 0) {
+			return "enum";
+		}
 
 		if (
 			columnType.includes("int") ||
@@ -169,111 +204,18 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 			return "number";
 		}
 
-		if (
-			columnType.includes("date") &&
-			!columnType.includes("datetime") &&
-			!columnType.includes("timestamp")
-		) {
-			return "date";
-		}
-
-		if (columnType.includes("datetime") || columnType.includes("timestamp")) {
-			return "datetime-local";
-		}
-
 		if (columnType.includes("json") || columnType.includes("array")) {
 			return "json";
 		}
 
+		// Default to text for dates and strings as requested
 		return "text";
-	};
-
-
-	// Format date for input
-	const formatDateForInput = (value: unknown, inputType: string): string => {
-		if (value === null || value === undefined) {
-			return "";
-		}
-
-		try {
-			let dateObj: Date;
-			let isValidDate = true;
-
-			if (value instanceof Date) {
-				dateObj = value;
-			} else if (typeof value === "string") {
-				// Try to parse the date string
-				dateObj = new Date(value);
-
-				// Check if the date is valid
-				if (Number.isNaN(dateObj.getTime())) {
-					isValidDate = false;
-					console.warn(`Invalid date value: ${value}`);
-					return typeof value === "string" ? value : String(value);
-				}
-			} else if (typeof value === "number") {
-				// Handle timestamp numbers
-				dateObj = new Date(value);
-				if (Number.isNaN(dateObj.getTime())) {
-					isValidDate = false;
-					return String(value);
-				}
-			} else {
-				console.warn(`Unsupported date value type: ${typeof value}`);
-				return String(value);
-			}
-
-			if (!isValidDate) {
-				return typeof value === "string" ? value : String(value);
-			}
-
-			if (inputType === "date") {
-				return dateObj.toISOString().split("T")[0];
-			}
-			if (inputType === "datetime-local") {
-				// Format as YYYY-MM-DDThh:mm
-				return dateObj.toISOString().slice(0, 16);
-			}
-		} catch (error) {
-			console.error("Error formatting date:", error);
-			// Return the original value as string if we can't format it
-			return typeof value === "string" ? value : String(value);
-		}
-
-		// Fallback to string representation of the value
-		return typeof value === "string" ? value : String(value);
 	};
 
 	// Truncate column name if it's too long
 	const truncateColumnName = (name: string, maxLength = 20): string => {
 		if (name.length <= maxLength) return name;
 		return `${name.substring(0, maxLength - 3)}...`;
-	};
-
-	// Check if a value is null in the edited values or original data
-	const isValueNull = (column: string): boolean => {
-		if (selectedRowKey && pendingChanges[selectedRowKey]?.changes[column]) {
-			return pendingChanges[selectedRowKey].changes[column].value === null;
-		}
-		return (
-			selectedRow?.[column] === null || selectedRow?.[column] === undefined
-		);
-	};
-
-	// Check if value is a valid date
-	const isValidDate = (value: unknown): boolean => {
-		if (value === null || value === undefined) return false;
-
-		if (value instanceof Date) {
-			return !Number.isNaN(value.getTime());
-		}
-
-		if (typeof value === "string" || typeof value === "number") {
-			const date = new Date(value);
-			return !Number.isNaN(date.getTime());
-		}
-
-		return false;
 	};
 
 	// Function to navigate between input fields in the sidebar
@@ -336,25 +278,6 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		{ enableOnFormTags: true },
 	);
 
-	// Add mod+shift+up/down shortcuts to navigate inputs
-	useHotkeys(
-		"mod+shift+up, mod+shift+up",
-		(event) => {
-			event.preventDefault();
-			navigateInputs("up");
-		},
-		{ enableOnFormTags: true },
-	);
-
-	useHotkeys(
-		"mod+shift+down, mod+shift+down",
-		(event) => {
-			event.preventDefault();
-			navigateInputs("down");
-		},
-		{ enableOnFormTags: true },
-	);
-
 	// Focus search input shortcut
 	useHotkeys(
 		"mod+shift+f, mod+shift+f",
@@ -370,7 +293,8 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	const handleOpenJsonModal = useCallback(
 		(column: string) => {
 			const value = getEffectiveValue(column);
-			const formattedValue = typeof value === 'string' ? value : formatValue(value);
+			const formattedValue =
+				typeof value === "string" ? value : formatValue(value);
 			setJsonEditorValue(formattedValue);
 			setActiveJsonColumn(column);
 			setJsonModalOpen(true);
@@ -482,142 +406,171 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 						<div className="space-y-3">
 							{filteredColumns.map((column) => {
 								const value = getEffectiveValue(column);
-								const isNull = isValueNull(column);
+								const isNull = value === null;
 								const canEdit = !isPrimaryKey(column);
 								const truncatedColumnName = truncateColumnName(column);
 								const inputType = getInputType(column);
 								const columnType = getColumnType(column);
-								
+								const enumValues = getColumnEnumValues(column);
+								const defaultValue = getColumnDefaultValue(column);
+
 								// Check if has pending change
-								const hasPendingChange = selectedRowKey && pendingChanges[selectedRowKey]?.changes[column];
+								const hasPendingChange =
+									selectedRowKey && pendingChanges[selectedRowKey]?.changes[column];
 
 								return (
 									<div
 										key={column}
-									className={`space-y-1 pb-2 border-b border-border/50 mb-2 ${hasPendingChange ? "bg-blue-50/30 -mx-2 px-2 rounded" : ""}`}
+										className={`space-y-1 pb-2 border-b border-border/50 mb-2 ${hasPendingChange ? "bg-blue-50/30 -mx-2 px-2 rounded" : ""}`}
 									>
 										<div className="flex justify-between items-center">
-											<label
-												htmlFor={`field-${column}`}
-											className={`text-xs font-medium ${hasPendingChange ? "text-blue-700 dark:text-blue-400" : "text-foreground"}`}
-												title={column} // Show full column name on hover
-											>
-												{truncatedColumnName}
+											<div className="flex items-center gap-1 overflow-hidden">
+												<label
+													htmlFor={`field-${column}`}
+													className={`text-xs font-medium truncate ${hasPendingChange ? "text-blue-700 dark:text-blue-400" : "text-foreground"}`}
+													title={column}
+												>
+													{truncatedColumnName}
+												</label>
 												{isPrimaryKey(column) && (
-												<span className="ml-1 text-xs bg-primary/15 text-primary px-1 py-0.5 rounded">
+													<span className="flex-shrink-0 text-xs bg-primary/15 text-primary px-1 py-0.5 rounded">
 														PK
 													</span>
 												)}
-												<span className="ml-1 text-xs bg-muted text-foreground px-1 py-0.5 rounded border border-border/60">
+												<span className="flex-shrink-0 text-xs bg-muted text-foreground px-1 py-0.5 rounded border border-border/60">
 													({columnType || "N/A"})
 												</span>
-											</label>
-											{inputType === "json" && canEdit && (
-												<Button
-													variant="ghost"
-													size="sm"
-													className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-													onClick={() => handleOpenJsonModal(column)}
-													title="Edit in full-screen"
-												>
-													<FiEdit
-														size={14}
-														className="text-blue-500 dark:text-blue-400"
-													/>
-												</Button>
+											</div>
+											
+											{canEdit && (
+												<div className="flex items-center">
+													{inputType === "json" && (
+														<Button
+															variant="ghost"
+															size="sm"
+															className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700 mr-1"
+															onClick={() => handleOpenJsonModal(column)}
+															title="Edit in full-screen"
+														>
+															<FiEdit
+																size={14}
+																className="text-blue-500 dark:text-blue-400"
+															/>
+														</Button>
+													)}
+													
+													<DropdownMenu>
+														<DropdownMenuTrigger asChild>
+															<Button
+																variant="ghost"
+																size="sm"
+																className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+															>
+																<FiMoreVertical size={14} />
+															</Button>
+														</DropdownMenuTrigger>
+														<DropdownMenuContent align="end">
+															<DropdownMenuItem
+																onClick={() => handleInputChange(column, null)}
+																disabled={isNull}
+															>
+																<FiTrash2 className="mr-2 h-4 w-4" />
+																Set to NULL
+															</DropdownMenuItem>
+															{inputType === "text" && (
+																<DropdownMenuItem
+																	onClick={() => handleInputChange(column, "")}
+																>
+																	<FiEdit className="mr-2 h-4 w-4" />
+																	Set to Empty String
+																</DropdownMenuItem>
+															)}
+															{defaultValue !== undefined && (
+																<DropdownMenuItem
+																	onClick={() => handleInputChange(column, defaultValue)}
+																>
+																	<FiRefreshCcw className="mr-2 h-4 w-4" />
+																	Set to Default
+																</DropdownMenuItem>
+															)}
+															<DropdownMenuSeparator />
+															{/* Revert Change */}
+															{hasPendingChange && (
+																<DropdownMenuItem
+																	onClick={() => {
+																		// Just setting to original value essentially reverts it
+																		// Or we could implement discardPendingChange specific to column
+																		// For now, re-set to original
+																		handleInputChange(column, selectedRow[column]);
+																	}}
+																>
+																	<FiRotateCcw className="mr-2 h-4 w-4" />
+																	Revert Change
+																</DropdownMenuItem>
+															)}
+														</DropdownMenuContent>
+													</DropdownMenu>
+												</div>
 											)}
 										</div>
 
-										{isNull ? (
-												<div className="w-full px-3 py-2 border border-border bg-muted rounded-md text-sm text-muted-foreground italic">
-												NULL
-											</div>
+										{/* Render Input based on type */}
+										{inputType === "enum" && enumValues ? (
+											<Select
+												disabled={!canEdit}
+												value={isNull ? "" : String(value)}
+												onValueChange={(val) => handleInputChange(column, val)}
+											>
+												<SelectTrigger className="w-full h-8 text-sm">
+													<SelectValue placeholder={isNull ? "NULL" : "Select value"} />
+												</SelectTrigger>
+												<SelectContent>
+													{enumValues.map((enumVal) => (
+														<SelectItem key={enumVal} value={enumVal}>
+															{enumVal}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 										) : inputType === "json" ? (
 											<div className="h-36 border border-blue-300 dark:border-blue-600 rounded-md overflow-hidden">
 												<Editor
 													height="100%"
 													language="json"
 													value={
-														// Value is already resolved by getEffectiveValue
-														// Just need to format it if object
-														typeof value === 'string' ? value : formatValue(value)
+														typeof value === "string" ? value : formatValue(value)
 													}
 													onChange={(value) =>
 														handleMonacoChange(column, value)
 													}
 													options={{
 														minimap: { enabled: false },
-														lineNumbers: "on",
 														fontSize: 12,
 														scrollBeyondLastLine: false,
 														automaticLayout: true,
 														wordWrap: "on",
 														readOnly: !canEdit,
-														theme: "vs-dark",
 													}}
+													theme={monacoTheme}
 												/>
 											</div>
-										) : inputType === "date" ||
-											inputType === "datetime-local" ? (
+										) : (
 											<div className="relative">
-												<input
+												<Input
 													id={`field-${column}`}
-													type={inputType}
+													type={inputType === "number" ? "number" : "text"}
 													readOnly={!canEdit}
-													value={
-														formatDateForInput(value, inputType)
+													value={isNull ? "" : String(value)}
+													placeholder={isNull ? "NULL" : ""}
+													onChange={(e) =>
+														handleInputChange(column, e.target.value)
 													}
-													onChange={
-														canEdit
-															? (e) =>
-																	handleInputChange(column, e.target.value)
-															: undefined
-													}
-													className={`w-full px-3 py-2 border rounded-md text-sm
+													className={`w-full px-3 py-2 border rounded-md text-sm h-9
 													${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
-													${!isValidDate(value) ? "border-amber-400 bg-amber-50/60" : ""}
+													${isNull ? "italic text-muted-foreground placeholder:text-muted-foreground/70" : ""}
 												`}
 												/>
-												{!isValidDate(value) && (
-													<div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-														Invalid date format. Edit to fix.
-													</div>
-												)}
 											</div>
-										) : inputType === "number" ? (
-											<input
-												id={`field-${column}`}
-												type="number"
-												readOnly={!canEdit}
-												value={
-													value === null ? "" : String(value)
-												}
-												onChange={
-													canEdit
-														? (e) => handleInputChange(column, e.target.value)
-														: undefined
-												}
-												className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
-											`}
-											/>
-										) : (
-											<input
-												id={`field-${column}`}
-												type="text"
-												readOnly={!canEdit}
-												value={
-													value === null ? "" : String(value)
-												}
-												onChange={
-													canEdit
-														? (e) => handleInputChange(column, e.target.value)
-														: undefined
-												}
-												className={`w-full px-3 py-2 border rounded-md text-sm
-												${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
-											`}
-											/>
 										)}
 									</div>
 								);
@@ -626,8 +579,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 					</div>
 				</>
 			)}
-			{/* Confirmation Dialog Removed - Handled Globally */}
-			
+
 			{/* Copy Row Modal */}
 			{activeTable && (
 				<CopyRowModal
@@ -673,7 +625,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 									automaticLayout: true,
 									wordWrap: "on",
 								}}
-								theme="vs"
+								theme={monacoTheme}
 							/>
 						</div>
 					</div>

@@ -475,12 +475,25 @@ class PostgresService {
 				throw new Error(`Table ${tableName} not found in PostgreSQL database`);
 			}
 
+			// Get enum types and their values for the current database
+			const enumTypes =
+				await this.connection`
+                SELECT t.typname as name, array_agg(e.enumlabel ORDER BY e.enumsortorder) as values
+                FROM pg_type t
+                JOIN pg_enum e ON t.oid = e.enumtypid
+                GROUP BY t.typname
+            `;
+			const enumMap = Object.fromEntries(
+				enumTypes.map((row) => [row.name as string, row.values as string[]]),
+			);
+
 			// Get columns with their data types
 			const columns = await this.connection`
                 SELECT 
                     column_name, 
                     data_type,
-                    udt_name
+                    udt_name,
+                    column_default
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                 AND table_name = ${correctTableName}
@@ -489,9 +502,12 @@ class PostgresService {
 
 			// Map PostgreSQL data types to the simplified types required
 			return columns.map((col) => {
+				const enumValues = enumMap[col.udt_name];
 				return {
 					column: col.column_name,
 					type: col.data_type.toLowerCase(),
+					enumValues,
+					defaultValue: col.column_default,
 				};
 			});
 		} catch (error) {

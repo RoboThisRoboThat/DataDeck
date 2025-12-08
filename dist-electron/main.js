@@ -40871,7 +40871,9 @@ class MySQLService {
         `
                 SELECT 
                     COLUMN_NAME, 
-                    DATA_TYPE
+                    DATA_TYPE,
+                    COLUMN_TYPE,
+                    COLUMN_DEFAULT
                 FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE() 
                 AND TABLE_NAME = ?
@@ -40879,12 +40881,22 @@ class MySQLService {
             `,
         [tableName]
       );
-      return columns.map(
-        (col) => ({
+      return columns.map((col) => {
+        const type2 = col.DATA_TYPE.toLowerCase();
+        let enumValues;
+        if (type2 === "enum" || type2 === "set") {
+          const matches = col.COLUMN_TYPE.match(/'([^']+)'/g);
+          if (matches) {
+            enumValues = matches.map((m) => m.replace(/'/g, ""));
+          }
+        }
+        return {
           column: col.COLUMN_NAME,
-          type: col.DATA_TYPE.toLowerCase()
-        })
-      );
+          type: type2,
+          enumValues,
+          defaultValue: col.COLUMN_DEFAULT
+        };
+      });
     } catch (error2) {
       console.error("Error getting MySQL table structure:", error2);
       throw error2;
@@ -43324,20 +43336,33 @@ class PostgresService {
       if (!correctTableName) {
         throw new Error(`Table ${tableName} not found in PostgreSQL database`);
       }
+      const enumTypes = await this.connection`
+                SELECT t.typname as name, array_agg(e.enumlabel ORDER BY e.enumsortorder) as values
+                FROM pg_type t
+                JOIN pg_enum e ON t.oid = e.enumtypid
+                GROUP BY t.typname
+            `;
+      const enumMap = Object.fromEntries(
+        enumTypes.map((row) => [row.name, row.values])
+      );
       const columns = await this.connection`
                 SELECT 
                     column_name, 
                     data_type,
-                    udt_name
+                    udt_name,
+                    column_default
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                 AND table_name = ${correctTableName}
                 ORDER BY ordinal_position
             `;
       return columns.map((col) => {
+        const enumValues = enumMap[col.udt_name];
         return {
           column: col.column_name,
-          type: col.data_type.toLowerCase()
+          type: col.data_type.toLowerCase(),
+          enumValues,
+          defaultValue: col.column_default
         };
       });
     } catch (error2) {

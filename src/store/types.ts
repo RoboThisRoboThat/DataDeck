@@ -9,7 +9,9 @@ import type {
 // Column structure interface
 export interface ColumnStructure {
 	column: string;
-	type: "json" | "string" | "number" | "boolean";
+	type: string;
+	enumValues?: string[];
+	defaultValue?: unknown;
 }
 
 // Table state interface
