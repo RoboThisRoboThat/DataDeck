@@ -407,33 +407,70 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	// Determine if we have data to show
 	const hasData = data.length > 0 && columns.length > 0;
 
-	// State for column widths (persisted)
+	// State for column widths (persisted) - only updated on resize end for performance
 	const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+	
+	// Ref to the table container for CSS variable manipulation
+	const tableContainerRef = useRef<HTMLDivElement>(null);
 	
 	// Use refs for resize state to avoid stale closures in event handlers
 	const resizeRef = useRef<{
-		column: string | null;
+		columnIndex: number | null;
 		startX: number;
 		startWidth: number;
-	}>({ column: null, startX: 0, startWidth: 0 });
+	}>({ columnIndex: null, startX: 0, startWidth: 0 });
 
-	// Handle column resize movement - defined as ref to avoid recreation
+	// Get default column width based on column name length
+	const getDefaultColumnWidth = useCallback((column: string): number => {
+		if (column.length > 30) return 300;
+		if (column.length > 20) return 250;
+		if (column.length > 10) return 200;
+		return 150;
+	}, []);
+
+	// Generate CSS variables for all columns - memoized
+	const columnWidthStyles = useMemo(() => {
+		const styles: Record<string, string> = {};
+		columns.forEach((column, index) => {
+			const width = columnWidths[column] || getDefaultColumnWidth(column);
+			styles[`--col-width-${index}`] = `${width}px`;
+		});
+		return styles;
+	}, [columns, columnWidths, getDefaultColumnWidth]);
+
+	// Handle column resize movement - update CSS variable directly (no React re-render)
 	const handleResizeMove = useRef((e: MouseEvent) => {
-		const { column, startX, startWidth } = resizeRef.current;
-		if (!column) return;
+		const { columnIndex, startX, startWidth } = resizeRef.current;
+		if (columnIndex === null || !tableContainerRef.current) return;
 
 		const diff = e.clientX - startX;
 		const newWidth = Math.max(100, startWidth + diff); // Minimum width of 100px
 
-		setColumnWidths((prev) => ({
-			...prev,
-			[column]: newWidth,
-		}));
+		// Update CSS variable directly on the container - bypasses React render
+		tableContainerRef.current.style.setProperty(`--col-width-${columnIndex}`, `${newWidth}px`);
 	}).current;
 
-	// Handle column resize end - defined as ref to avoid recreation
+	// Handle column resize end - persist to React state
 	const handleResizeEnd = useRef(() => {
-		resizeRef.current.column = null;
+		const { columnIndex } = resizeRef.current;
+		
+		if (columnIndex !== null && tableContainerRef.current) {
+			// Read the final width from CSS variable
+			const finalWidth = tableContainerRef.current.style.getPropertyValue(`--col-width-${columnIndex}`);
+			const column = columns[columnIndex];
+			
+			if (column && finalWidth) {
+				const widthValue = parseInt(finalWidth, 10);
+				if (!isNaN(widthValue)) {
+					setColumnWidths((prev) => ({
+						...prev,
+						[column]: widthValue,
+					}));
+				}
+			}
+		}
+		
+		resizeRef.current.columnIndex = null;
 
 		// Remove event listeners
 		document.removeEventListener("mousemove", handleResizeMove);
@@ -441,13 +478,13 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	}).current;
 
 	// Handle column resize start
-	const handleResizeStart = (e: React.MouseEvent, column: string) => {
+	const handleResizeStart = (e: React.MouseEvent, column: string, columnIndex: number) => {
 		e.preventDefault();
 		e.stopPropagation(); // Prevent triggering sort
 		
 		// Store resize state in ref
 		resizeRef.current = {
-			column,
+			columnIndex,
 			startX: e.clientX,
 			startWidth: columnWidths[column] || getDefaultColumnWidth(column),
 		};
@@ -465,23 +502,10 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		};
 	}, [handleResizeMove, handleResizeEnd]);
 
-	// Get column width from state or default
-	const getColumnWidth = (column: string): number => {
-		return columnWidths[column] || getDefaultColumnWidth(column);
-	};
-
-	// Get default column width based on column name length
-	const getDefaultColumnWidth = (column: string): number => {
-		if (column.length > 30) return 300;
-		if (column.length > 20) return 250;
-		if (column.length > 10) return 200;
-		return 150;
-	};
-
-	// Replace the getCellWidth function
-	const getCellWidth = (column: string): string => {
-		return `${getColumnWidth(column)}px`;
-	};
+	// Get CSS variable name for column width
+	const getColumnWidthVar = useCallback((columnIndex: number): string => {
+		return `var(--col-width-${columnIndex})`;
+	}, []);
 
 	// Handle row selection - memoized to prevent unnecessary re-renders
 	const handleRowSelect = useCallback(
@@ -499,8 +523,8 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 	// Render the table header with click-to-sort
 	const renderTableHeader = () => (
 		<div className="sticky top-0 z-10 flex border-b border-border/60 bg-card/80 shadow-sm w-fit backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
-			{columns.map((column) => {
-				const width = getCellWidth(column);
+			{columns.map((column, colIndex) => {
+				const widthVar = getColumnWidthVar(colIndex);
 				const isPrimaryKey = primaryKeys.includes(column);
 				const isColumnSorted = sortConfig.column === column;
 
@@ -513,9 +537,9 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 								: "text-foreground"
 						} ${isColumnSorted ? "bg-primary/10" : ""}`}
 						style={{
-							width,
-							minWidth: width,
-							maxWidth: width,
+							width: widthVar,
+							minWidth: widthVar,
+							maxWidth: widthVar,
 							borderRight: "1px solid var(--border)",
 						}}
 						onClick={() => handleColumnHeaderClick(column)}
@@ -573,7 +597,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 						{/* Column resize handle */}
 						<div
 							className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-blue-300/50 active:bg-blue-400/50 z-20"
-							onMouseDown={(e) => handleResizeStart(e, column)}
+							onMouseDown={(e) => handleResizeStart(e, column, colIndex)}
 							onClick={(e) => e.stopPropagation()}
 							onKeyDown={(e) => e.stopPropagation()}
 							role="separator"
@@ -585,21 +609,11 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 		</div>
 	);
 
-	// Compute selected row key for efficient comparison
+	// Compute selected row key for efficient comparison - passed to TableRow for optimized memoization
 	const selectedRowKey = useMemo(() => {
 		if (!selectedRow || primaryKeys.length === 0) return null;
-		return primaryKeys.map((key) => selectedRow[key]).join("-");
+		return getRowKey(selectedRow, primaryKeys);
 	}, [selectedRow, primaryKeys]);
-
-	// Check if a row is selected
-	const isRowSelected = useCallback(
-		(row: TableDataRow) => {
-			if (!selectedRowKey || primaryKeys.length === 0) return false;
-			const rowKey = primaryKeys.map((key) => row[key]).join("-");
-			return rowKey === selectedRowKey;
-		},
-		[selectedRowKey, primaryKeys],
-	);
 
 	// Render empty state
 	const renderEmptyState = () => (
@@ -820,9 +834,13 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 
 				{/* Table container with fixed height and horizontal scroll */}
 				<div
-					ref={tableRef}
+					ref={(el) => {
+						// Combine refs
+						(tableRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+						(tableContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+					}}
 					className="relative overflow-auto bg-card flex-1"
-					style={{ maxHeight: "calc(100vh - 50px)" }}
+					style={{ maxHeight: "calc(100vh - 50px)", ...columnWidthStyles } as React.CSSProperties}
 				>
 					{/* Table header (sticky) */}
 					{columns.length > 0 && (
@@ -847,8 +865,7 @@ const DataTable = ({ tableName, connectionId }: DataTableProps) => {
 										rowIndex={index}
 										columns={columns}
 										primaryKeys={primaryKeys}
-										isSelected={isRowSelected(row)}
-										columnWidths={columnWidths}
+										selectedRowKey={selectedRowKey}
 										onRowSelect={handleRowSelect}
 										onCopyCellContent={handleCopyCellContent}
 										pendingChanges={rowChanges}

@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useMemo } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -18,12 +18,11 @@ interface TableRowProps {
 	rowIndex: number;
 	columns: string[];
 	primaryKeys: string[];
-	isSelected: boolean;
-	columnWidths: Record<string, number>;
+	selectedRowKey: string | null; // Changed from isSelected to selectedRowKey
 	onRowSelect: (row: TableDataRow) => void;
 	onCopyCellContent: (value: unknown) => void;
 	pendingChanges?: PendingRowChanges | null;
-	rowKey?: string;
+	rowKey: string;
 	tableName?: string;
 }
 
@@ -57,28 +56,9 @@ const formatCellValue = (value: unknown): string => {
 	return String(value);
 };
 
-// Get default column width based on column name length
-const getDefaultColumnWidth = (column: string): number => {
-	if (column.length > 30) return 300;
-	if (column.length > 20) return 250;
-	if (column.length > 10) return 200;
-	return 150;
-};
-
-// Get column width from state or default
-const getColumnWidth = (
-	column: string,
-	columnWidths: Record<string, number>,
-): number => {
-	return columnWidths[column] || getDefaultColumnWidth(column);
-};
-
-// Get cell width as string
-const getCellWidth = (
-	column: string,
-	columnWidths: Record<string, number>,
-): string => {
-	return `${getColumnWidth(column, columnWidths)}px`;
+// Get CSS variable name for column width
+const getColumnWidthVar = (columnIndex: number): string => {
+	return `var(--col-width-${columnIndex})`;
 };
 
 // Check if a value is JSON (object or array, or a string that parses to one)
@@ -102,13 +82,45 @@ const isJsonValue = (value: unknown): boolean => {
 	return false;
 };
 
-const TableRow = memo(function TableRow({
+// Custom comparison function for memo - only re-render if this row's selection changes
+const arePropsEqual = (prevProps: TableRowProps, nextProps: TableRowProps): boolean => {
+	// Check if this row's selection status changed
+	const prevIsSelected = prevProps.selectedRowKey === prevProps.rowKey;
+	const nextIsSelected = nextProps.selectedRowKey === nextProps.rowKey;
+	
+	if (prevIsSelected !== nextIsSelected) {
+		return false; // Selection changed for this row, re-render
+	}
+	
+	// Check other props that matter
+	if (prevProps.rowIndex !== nextProps.rowIndex) return false;
+	if (prevProps.rowKey !== nextProps.rowKey) return false;
+	if (prevProps.tableName !== nextProps.tableName) return false;
+	
+	// Check if row data changed (shallow comparison of row object)
+	if (prevProps.row !== nextProps.row) return false;
+	
+	// Check if pending changes for this row changed
+	if (prevProps.pendingChanges !== nextProps.pendingChanges) return false;
+	
+	// Check if columns array reference changed
+	if (prevProps.columns !== nextProps.columns) return false;
+	
+	// Check if primary keys changed
+	if (prevProps.primaryKeys !== nextProps.primaryKeys) return false;
+	
+	// Functions are stable (memoized in parent)
+	// onRowSelect and onCopyCellContent don't need comparison
+	
+	return true; // Props are equal, skip re-render
+};
+
+function TableRowComponent({
 	row,
 	rowIndex,
 	columns,
 	primaryKeys,
-	isSelected,
-	columnWidths,
+	selectedRowKey,
 	onRowSelect,
 	onCopyCellContent,
 	pendingChanges,
@@ -119,6 +131,9 @@ const TableRow = memo(function TableRow({
 	const [editingColumn, setEditingColumn] = useState<string | null>(null);
 	const [editValue, setEditValue] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
+	
+	// Compute if this row is selected
+	const isSelected = useMemo(() => selectedRowKey === rowKey, [selectedRowKey, rowKey]);
 	
 	// State for Edit Cell Modal (for JSON editing)
 	const [editModalOpen, setEditModalOpen] = useState(false);
@@ -236,7 +251,7 @@ const TableRow = memo(function TableRow({
 				aria-selected={isSelected}
 				style={{ cursor: "pointer" }}
 			>
-				{columns.map((column) => {
+				{columns.map((column, colIndex) => {
 					const originalValue = row[column];
 					const pendingChange = pendingChanges?.changes[column];
 					const hasPendingChange = !!pendingChange;
@@ -245,7 +260,7 @@ const TableRow = memo(function TableRow({
 					const isJson = isJsonValue(displayValue);
 
 					const isPrimaryKey = primaryKeys.includes(column);
-					const width = getCellWidth(column, columnWidths);
+					const widthVar = getColumnWidthVar(colIndex);
 
 					// Special styling based on value type
 					const isNull = displayValue === null || displayValue === undefined;
@@ -258,9 +273,9 @@ const TableRow = memo(function TableRow({
 								hasPendingChange ? "bg-blue-50/50 dark:bg-blue-900/20" : ""
 							}`}
 							style={{
-								width,
-								minWidth: width,
-								maxWidth: width,
+								width: widthVar,
+								minWidth: widthVar,
+								maxWidth: widthVar,
 								borderRight: "1px solid var(--border)",
 							}}
 							onDoubleClick={(e) => {
@@ -345,6 +360,8 @@ const TableRow = memo(function TableRow({
 			)}
 		</>
 	);
-});
+}
+
+const TableRow = memo(TableRowComponent, arePropsEqual);
 
 export default TableRow;

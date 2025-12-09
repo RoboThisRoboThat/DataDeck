@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAppSelector, useAppDispatch } from "../../../store/hooks";
 import {
@@ -40,6 +40,47 @@ import Editor from "@monaco-editor/react";
 import CopyRowModal from "./CopyRowModal";
 import { getRowKey } from "../utils/rowKey";
 import { useTheme } from "@/context/ThemeContext";
+
+// Helper to parse value to correct type based on column type
+const parseValueForColumn = (
+	value: string,
+	columnType: string
+): unknown => {
+	// Handle empty string - keep as empty string for text, null for others
+	if (value === "") {
+		if (columnType.includes("int") || columnType.includes("float") || 
+			columnType.includes("double") || columnType.includes("decimal") ||
+			columnType.includes("numeric")) {
+			return null;
+		}
+		return "";
+	}
+
+	const lowerType = columnType.toLowerCase();
+
+	// Parse numbers
+	if (
+		lowerType.includes("int") ||
+		lowerType.includes("float") ||
+		lowerType.includes("double") ||
+		lowerType.includes("decimal") ||
+		lowerType.includes("numeric")
+	) {
+		const parsed = lowerType.includes("int") 
+			? parseInt(value, 10) 
+			: parseFloat(value);
+		return isNaN(parsed) ? value : parsed;
+	}
+
+	// Parse booleans
+	if (lowerType.includes("bool")) {
+		if (value.toLowerCase() === "true" || value === "1") return true;
+		if (value.toLowerCase() === "false" || value === "0") return false;
+	}
+
+	// Default: return as string
+	return value;
+};
 
 interface RightSidebarProps {
 	connectionId: string;
@@ -130,9 +171,9 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 		[selectedRow, selectedRowKey, pendingChanges],
 	);
 
-	// Handle input change - now updates global pending state
+	// Handle input change - now updates global pending state with type parsing
 	const handleInputChange = useCallback(
-		(column: string, value: unknown) => {
+		(column: string, value: unknown, shouldParseType = false) => {
 			if (!activeTable || !selectedRowKey || !selectedRow) return;
 
 			const primaryKeyValues: Record<string, unknown> = {};
@@ -140,18 +181,25 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 				primaryKeyValues[pk] = selectedRow[pk];
 			});
 
+			// Parse value to correct type if it's a string from input
+			let parsedValue = value;
+			if (shouldParseType && typeof value === "string") {
+				const columnType = getColumnType(column);
+				parsedValue = parseValueForColumn(value, columnType);
+			}
+
 			dispatch(
 				setPendingChange({
 					tableName: activeTable,
 					rowKey: selectedRowKey,
 					primaryKeyValues,
 					column,
-					value: value,
+					value: parsedValue,
 					originalValue: selectedRow[column],
 				}),
 			);
 		},
-		[activeTable, selectedRow, selectedRowKey, primaryKeys, dispatch],
+		[activeTable, selectedRow, selectedRowKey, primaryKeys, dispatch, structure],
 	);
 
 	// Handle Monaco editor change
@@ -459,17 +507,14 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 														</Button>
 													)}
 													
-													<DropdownMenu>
-														<DropdownMenuTrigger asChild>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-															>
-																<FiMoreVertical size={14} />
-															</Button>
+													<DropdownMenu modal={false}>
+														<DropdownMenuTrigger
+															className="h-6 w-6 p-0 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
+															onClick={(e) => e.stopPropagation()}
+														>
+															<FiMoreVertical size={14} />
 														</DropdownMenuTrigger>
-														<DropdownMenuContent align="end">
+														<DropdownMenuContent align="end" className="z-[200]">
 															<DropdownMenuItem
 																onClick={() => handleInputChange(column, null)}
 																disabled={isNull}
@@ -563,7 +608,7 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 													value={isNull ? "" : String(value)}
 													placeholder={isNull ? "NULL" : ""}
 													onChange={(e) =>
-														handleInputChange(column, e.target.value)
+														handleInputChange(column, e.target.value, true)
 													}
 													className={`w-full px-3 py-2 border rounded-md text-sm h-9
 													${canEdit ? "border-border bg-card text-foreground" : "border-border bg-muted text-muted-foreground"}
@@ -656,4 +701,4 @@ function RightSidebar({ connectionId }: RightSidebarProps) {
 	);
 }
 
-export default memo(RightSidebar);
+export default RightSidebar;
